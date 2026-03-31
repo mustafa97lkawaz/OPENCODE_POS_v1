@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/minimax-m2.5-free",
+  "autoupdate": false,
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "php artisan *": "allow",
+      "composer *": "allow",
+      "git *": "allow",
+      "*": "ask"
+    }
+  },
+  "mcp": {
+    "GitHub": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "enabled": true,
+"headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}

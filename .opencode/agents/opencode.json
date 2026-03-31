@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "provider": "anthropic",
+  "instructions": "CLAUDE.md",
+  "agents": [
+    {
+      "name": "BackendAgent",
+      "description": "Generates Migration, Model, Controller, Routes for any module. Reads SKILL_BACKEND.md first. Never touches views.",
+      "instructions": "AGENT_BACKEND.md",
+      "skills": ["SKILL_BACKEND.md"],
+      "model": "anthropic/claude-sonnet-4-5"
+    },
+    {
+      "name": "FrontendAgent",
+      "description": "Generates ONE Blade file per module with Table + Add Modal + Edit Modal + Delete Modal using Valexa Dashboard. Reads SKILL_FRONTEND.md first.",
+      "instructions": "AGENT_FRONTEND.md",
+      "skills": ["SKILL_FRONTEND.md"],
+      "model": "anthropic/claude-sonnet-4-5"
+    }
+  ],
+  "skills": [
+    { "name": "SKILL_BACKEND",  "path": "SKILL_BACKEND.md" },
+    { "name": "SKILL_FRONTEND", "path": "SKILL_FRONTEND.md" }
+  ]
+}

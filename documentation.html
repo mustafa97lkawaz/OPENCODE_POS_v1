@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS System Documentation - نظام نقاط البيع</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        header p { font-size: 1.2em; opacity: 0.9; }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .section h3 { color: #764ba2; margin-top: 25px; margin-bottom: 15px; }
+        code { background: #f4f4f4; padding: 2px 8px; border-radius: 4px; color: #e83e8c; }
+        pre { background: #282c34; color: #abb2bf; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; }
+        pre code { background: none; color: inherit; padding: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .card { background: #f8f9fa; padding: 20px; border-radius: 8px; border-right: 4px solid #667eea; }
+        .card h4 { color: #333; margin-bottom: 10px; }
+        .card ul { list-style: none; padding: 0; }
+        .card li { padding: 5px 0; border-bottom: 1px solid #eee; }
+        .mermaid { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: right; border: 1px solid #ddd; }
+        th { background: #667eea; color: white; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .info { background: #d1ecf1; border: 1px solid #17a2b8; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .success { background: #d4edda; border: 1px solid #28a745; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        footer { text-align: center; padding: 20px; color: #666; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏪 نظام نقاط البيع (POS)</h1>
+            <p>توثيق تقني شامل - Technical Documentation</p>
+            <p>الإصدار 1.0 - March 2026</p>
+        </header>
+
+        <div class="section">
+            <h2>1. نظرة عامة على النظام</h2>
+            <div class="grid">
+                <div class="card">
+                    <h4>💰 المبيعات</h4>
+                    <ul><li>شاشة POS تفاعلية</li><li>دعم طرق دفع متعددة</li><li>إدارة المبيعات المعلقة</li></ul>
+                </div>
+                <div class="card">
+                    <h4>📦 المخزون</h4>
+                    <ul><li>إدارة المنتجات</li><li>تصنيف المنتجات</li><li>تتبع المخزون</li></ul>
+                </div>
+                <div class="card">
+                    <h4>👥 العملاء</h4>
+                    <ul><li>إدارة العملاء</li><li>الموردين</li><li>التقارير</li></ul>
+                </div>
+                <div class="card">
+                    <h4>💸 المصروفات</h4>
+                    <ul><li>تصنيف المصروفات</li><li>تتبع المصروفات</li><li>التقارير المالية</li></ul>
+                </div>
+            </div>
+            <h3>التقنيات المستخدمة</h3>
+            <ul>
+                <li><strong>Backend:</strong> Laravel 10.x</li>
+                <li><strong>Frontend:</strong> Blade Templates + jQuery</li>
+                <li><strong>Database:</strong> MySQL</li>
+                <li><strong>UI:</strong> Valex Admin Template</li>
+            </ul>
+        </div>
+
+        <div class="section" id="database">
+            <h2>2. هيكل قاعدة البيانات</h2>
+            <h3>ER Diagram - مخطط العلاقات</h3>
+            <div class="mermaid">
+                erDiagram
+                    USERS ||--o{ SALES : "creates"
+                    CUSTOMERS ||--o{ SALES : "places"
+                    SALES ||--|{ SALE_ITEMS : "contains"
+                    PRODUCTS ||--o{ SALE_ITEMS : "sold_as"
+                    PRODUCTS }o--|| CATEGORIES : "belongs_to"
+                    PRODUCTS ||--o{ STOCK_ADJUSTMENTS : "adjusted"
+                    CUSTOMERS ||--o{ SUSPENDED_SALES : "has"
+            </div>
+            <table>
+                <tr><th>الجدول</th><th>الوصف</th><th>الحقول الرئيسية</th></tr>
+                <tr><td>users</td><td>المستخدمين</td><td>id, name, email, password, role</td></tr>
+                <tr><td>products</td><td>المنتجات</td><td>id, Product_name, category_id, sku, barcode, sell_price, stock_qty</td></tr>
+                <tr><td>categories</td><td>التصنيفات</td><td>id, Category_name</td></tr>
+                <tr><td>sales</td><td>المبيعات</td><td>id, invoice_number, customer_id, subtotal, tax_amount, discount, total, payment_method</td></tr>
+                <tr><td>sale_items</td><td>بنود المبيعات</td><td>id, sale_id, product_id, qty, unit_price, total</td></tr>
+                <tr><td>customers</td><td>العملاء</td><td>id, Customer_name, phone, email, type, account_balance</td></tr>
+                <tr><td>suppliers</td><td>الموردين</td><td>id, Supplier_name, phone, email</td></tr>
+                <tr><td>expenses</td><td>المصروفات</td><td>id, expense_category_id, amount, description, date</td></tr>
+                <tr><td>stock_adjustments</td><td>تعديلات المخزون</td><td>id, product_id, adjustment_type, quantity, reason</td></tr>
+                <tr><td>suspended_sales</td><td>المبيعات المعلقة</td><td>id, invoice_number, customer_id, items_json, total</td></tr>
+            </table>
+            <div class="info"><strong>💡 ملاحظة:</strong> حقل <code>Status</code> يُستخدم للتحكم في حالة السجل</div>
+        </div>
+
+        <div class="section" id="workflow">
+            <h2>3. سير العمل (Workflow)</h2>
+            <h3>3.1 عملية البيع</h3>
+            <div class="mermaid">
+                graph TD
+                    A[اختيار المنتجات] --> B[إضافة للسلة]
+                    B --> C{اختيار العميل?}
+                    C -->|نعم| D[عميل مسجل]
+                    C -->|لا| E[زائر]
+                    D --> F[اختيار طريقة الدفع]
+                    E --> F
+                    F --> G{النوع}
+                    G -->|نقدي| H[حساب الباقي]
+                    G -->|بطاقة| I[تأكيد]
+                    G -->|تقسيم| J[نقدي+بطاقة]
+                    H --> K[تأكيد]
+                    I --> K
+                    J --> K
+                    K --> L[تحديث المخزون]
+                    L --> M[إنشاء فاتورة]
+            </div>
+            <h3>3.2 سير عمل المخزون</h3>
+            <div class="mermaid">
+                graph LR
+                    A[شراء من المورد] --> B[إضافة المخزون]
+                    B --> C[المستودع]
+                    C --> D[بيع عبر POS]
+                    D --> E[خصم المخزون]
+                    E --> F{منخفض؟}
+                    F -->|نعم| G[تنبيه]
+                    F -->|لا| H[متابعة]
+            </div>
+            <div class="warning"><strong>⚠️Important:</strong> عند حذف بيع، يتم إعادة المخزون تلقائياً</div>
+        </div>
+
+        <div class="section" id="controllers">
+            <h2>4. التحكمات (Controllers)</h2>
+            <table>
+                <tr><th>الكونترولر</th><th>الوصف</th><th>الدوال</th></tr>
+                <tr><td>SaleController</td><td>المبيعات</td><td>index, pos, store, destroy, suspend</td></tr>
+                <tr><td>ProductsController</td><td>المنتجات</td><td>index, store, update, destroy</td></tr>
+                <tr><td>CategoryController</td><td>التصنيفات</td><td>index, store, update, destroy</td></tr>
+                <tr><td>CustomerController</td><td>العملاء</td><td>index, store, update, destroy</td></tr>
+                <tr><td>SupplierController</td><td>الموردين</td><td>index, store, update, destroy</td></tr>
+                <tr><td>ExpenseController</td><td>المصروفات</td><td>index, store, update, destroy</td></tr>
+                <tr><td>StockAdjustmentController</td><td>المخزون</td><td>index, store</td></tr>
+            </table>
+        </div>
+
+        <div class="section" id="routes">
+            <h2>5. المسارات (Routes)</h2>
+            <pre><code>// POS
+GET  /pos                    → شاشة POS
+GET  /pos/products            → جلب المنتجات (AJAX)
+GET  /pos/products/search     → البحث (AJAX)
+GET  /pos/products/barcode/{id} → بالباركود (AJAX)
+
+// Sales
+POST /sales                  → حفظ بيع
+POST /sales/suspend          → تعليق بيع
+GET  /suspended-sales        → المبيعات المعلقة
+POST /suspended-sales/{id}/resume → استئناف
+
+// Resources
+Route::resource('products');
+Route::resource('categories');
+Route::resource('customers');
+Route::resource('suppliers');
+Route::resource('expenses');</code></pre>
+        </div>
+
+        <div class="section" id="pos">
+            <h2>6. شاشة POS التقنية</h2>
+            <h3>6.1 الهيكل</h3>
+            <div class="mermaid">
+                graph TB
+                    A[POS] --> B[Header: البحث + العميل]
+                    A --> C[Left: المنتجات]
+                    A --> D[Right: السلة]
+                    C --> C1[تصنيفات]
+                    C --> C2[شبكة المنتجات]
+                    D --> D1[عناصر السلة]
+                    D --> D2[المجموع+الضريبة]
+                    D --> D3[أزرار الدفع]
+            </div>
+            <h3>6.2_functions JavaScript</h3>
+            <pre><code>loadProducts(categoryId)    // تحميل المنتجات
+addToCartDirect(id,name,price,stock)  // إضافة للسلة
+renderCart()                // رسم السلة
+updateTotals()              // تحديث المجموع
+openPaymentModal()          // فتح نافذة الدفع
+processPayment()            // معالجة الدفع
+suspendSale()               // تعليق البيع
+clearCart()                 // مسح السلة</code></pre>
+            <h3>6.3 Keyboard Shortcuts</h3>
+            <div class="success">
+                <strong>F2</strong> - دفع | <strong>F4</strong> - تعليق | <strong>Esc</strong> - مسح
+            </div>
+            <ul>
+                <li>الضريبة: 15% (تعديل في TAX_RATE)</li>
+                <li>الدفع: نقدي - بطاقة - تقسيم</li>
+                <li>البحث: بالاسم أو الباركود</li>
+            </ul>
+        </div>
+
+        <div class="section" id="modify">
+            <h2>7. كيفية التعديل والتطوير</h2>
+            <h3>7.1 إضافة خاصية جديدة</h3>
+            <ol><li>إنشاء Migration</li><li>إنشاء Model</li><li>إضافة Controller</li><li>إضافة Route</li><li>إنشاء View</li></ol>
+            <h3>7.2 تعديل الضريبة</h3>
+            <pre><code>const TAX_RATE = 0.15; // في pos.blade.php</code></pre>
+            <h3>7.3 أوامر مفيدة</h3>
+            <pre><code>php artisan make:controller NameController
+php artisan make:migration create_table
+php artisan make:model ModelName
+php artisan migrate
+php artisan route:list
+php artisan cache:clear</code></pre>
+            <div class="warning">
+                <strong>ملاحظات مهمة:</strong>
+                <ul>
+                    <li>Always backup قبل التغييرات</li>
+                    <li>اتبع Laravel best practices</li>
+                    <li>اختبر كل التغييرات</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p>📝 توثيق نظام نقاط البيع - POS System Documentation</p>
+            <p>تم الإنشاء - مارس 2026</p>
+        </footer>
+    </div>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>
