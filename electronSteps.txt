@@ -1,0 +1,136 @@
+================================================================================
+ELECTRON DESKTOP APP - SETUP STEPS
+================================================================================
+
+OVERVIEW
+================================================================================
+This document explains how the Laravel POS project was converted to an Electron
+desktop application that runs the Laravel app in an embedded Chromium window.
+
+WHAT WAS DONE
+================================================================================
+
+Step 1: Install Electron Dependencies
+--------------------------------------------------------------------------------
+Command: npm install electron electron-builder --save-dev
+
+This installs:
+- electron (v41.2.0) - The desktop framework
+- electron-builder (v26.8.1) - For packaging the app to .exe
+
+Step 2: Create Electron Main Process File
+--------------------------------------------------------------------------------
+File: electron/main.js
+
+Created with features:
+- BrowserWindow that loads Laravel URL
+- System tray with minimize to tray
+- Native application menus (File, Edit, View, Window, Help)
+- Window controls (minimize, maximize, close)
+- Auto-start option (LoginItemSettings)
+
+Step 3: Create Preload Script
+--------------------------------------------------------------------------------
+File: electron/preload.js
+
+Provides secure context bridge between main and renderer process,
+allowing window control functions to work properly.
+
+Step 4: Update package.json
+--------------------------------------------------------------------------------
+Added:
+- "main": "electron/main.js"
+- Scripts for electron:start and electron:build
+- Build configuration for electron-builder
+
+Step 5: Configure the Laravel URL
+--------------------------------------------------------------------------------
+Updated LARAVEL_URL in electron/main.js to point to:
+- http://localhost/pos_opencodee/public
+
+This is the correct path based on XAMPP DocumentRoot configuration.
+
+
+CURRENT TECHNOLOGY STACK
+================================================================================
+
+Desktop Framework:
+- Electron v41.2.0
+- electron-builder v26.8.1
+
+Backend (unchanged):
+- Laravel (PHP framework)
+- SQLite database
+- XAMPP (Apache + PHP)
+
+Build Tools:
+- Node.js & npm
+
+
+HOW TO RUN THE APP
+================================================================================
+
+Option 1: Run in Development Mode
+--------------------------------------------------------------------------------
+Command: npm run electron:start
+
+This starts Electron in development mode. Shows console output and logs.
+Useful for debugging.
+
+Option 2: Run the Built Executable
+--------------------------------------------------------------------------------
+File: dist/win-unpacked/POS Desktop.exe
+
+This is the portable executable. No installation needed.
+Simply double-click to run.
+
+
+HOW TO BUILD THE APP
+================================================================================
+
+Command: npm run electron:build
+
+Output: dist/win-unpacked/POS Desktop.exe
+
+This creates the packaged application in the dist folder.
+
+
+IMPORTANT PREREQUISITES
+================================================================================
+
+1. XAMPP must be running before launching the Electron app
+2. Apache should be running on port 80
+3. The Laravel app should be accessible at:
+   http://localhost/pos_opencodee/public
+
+
+FEATURES INCLUDED
+================================================================================
+
+1. Loads Laravel POS in embedded Chromium window
+2. System tray (minimize to tray on close)
+3. Native menus (File, Edit, View, Window, Help)
+4. Window controls (minimize, maximize, close)
+5. Always on top option in Window menu
+6. Refresh functionality
+7. Open in external browser option
+8. About dialog
+
+
+TROUBLESHOOTING
+================================================================================
+
+Issue: ERR_CONNECTION_REFUSED
+Solution: Make sure XAMPP Apache is running before starting Electron
+
+Issue: App shows XAMPP default page
+Solution: Check LARAVEL_URL in electron/main.js - it should point to
+          http://localhost/pos_opencodee/public (not just http://localhost)
+
+Issue: Cannot rebuild (file in use)
+Solution: Close any running Electron processes first
+
+
+================================================================================
+Created: April 2026
+================================================================================

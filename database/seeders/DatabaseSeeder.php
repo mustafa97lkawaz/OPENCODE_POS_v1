@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             SupplierSeeder::class,
             ExpenseCategorySeeder::class,
             PermissionSeeder::class,
+            CreateAdminUserSeeder::class,
         ]);
     }
 }
