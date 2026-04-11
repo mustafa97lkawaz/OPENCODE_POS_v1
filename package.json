@@ -14,7 +14,8 @@
         "prod": "npm run production",
         "production": "mix --production",
         "electron:start": "electron .",
-        "electron:build": "electron-builder --win --x64"
+        "electron:build": "electron-builder --win --x64",
+        "launch": "node launcher.js"
     },
     "devDependencies": {
         "@popperjs/core": "^2.10.2",
