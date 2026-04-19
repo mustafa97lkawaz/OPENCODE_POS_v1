@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\PrintController;
 
 Route::get('/', function () {
     return view('auth.login');
@@ -53,6 +54,12 @@ Route::group(['middleware' => ['auth']], function() {
     Route::get('pos/products/search', [App\Http\Controllers\SaleController::class, 'searchProducts'])->name('pos.products.search');
     Route::get('pos/products/barcode/{barcode}', [App\Http\Controllers\SaleController::class, 'getProductByBarcode'])->name('pos.products.barcode');
     
+    // Print
+    Route::get('print/printers',              [PrintController::class, 'getPrinters'])->name('print.printers');
+    Route::get('print/test',                  [PrintController::class, 'testPrint'])->name('print.test');
+    Route::get('print/receipt/{saleId}',      [PrintController::class, 'printReceipt'])->name('print.receipt');
+    Route::get('print/debug/{name?}',         [PrintController::class, 'debugPrinter'])->name('print.debug');
+
     // Settings
     Route::resource('settings', App\Http\Controllers\SettingController::class);
     

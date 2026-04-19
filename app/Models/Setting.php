@@ -11,6 +11,7 @@ class Setting extends Model
 
     protected $fillable = [
         'printer_type',
+        'printer_name',
         'receipt_header',
         'receipt_footer',
         'vat_number',

@@ -958,7 +958,44 @@
             $('#cashAmountInput').val(cashAmount);
             $('#cardAmountInput').val(cardAmount);
 
-            $('#saleForm').submit();
+            $('#paymentModal').modal('hide');
+
+            var formData = $('#saleForm').serialize();
+            $.ajax({
+                url: '{{ route("sales.store") }}',
+                type: 'POST',
+                data: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                success: function (res) {
+                    if (res.success) {
+                        // Silent direct print — fire and forget
+                        $.get('{{ url("print/receipt") }}/' + res.sale_id)
+                            .fail(function (xhr) {
+                                var msg = xhr.responseJSON ? xhr.responseJSON.message : 'تعذّرت الطباعة، تحقق من اتصال الطابعة';
+                                showPosToast(msg, 'warning');
+                            });
+
+                        cart = [];
+                        renderCart();
+                        $('#customerSelect').val('').trigger('change');
+                        showPosToast('تم البيع بنجاح ✓', 'success');
+                    } else {
+                        showPosToast('خطأ في حفظ البيع', 'danger');
+                    }
+                },
+                error: function (xhr) {
+                    var msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'حدث خطأ، حاول مجدداً';
+                    showPosToast(msg, 'danger');
+                }
+            });
+        }
+
+        function showPosToast(message, type) {
+            var id = 'posToast_' + Date.now();
+            var bg = type === 'success' ? 'bg-success' : (type === 'warning' ? 'bg-warning' : 'bg-danger');
+            var toast = $('<div id="' + id + '" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;min-width:260px;" class="alert alert-' + type + ' text-center shadow">' + message + '</div>');
+            $('body').append(toast);
+            setTimeout(function () { $('#' + id).fadeOut(400, function () { $(this).remove(); }); }, 3000);
         }
 
         // Suspend sale

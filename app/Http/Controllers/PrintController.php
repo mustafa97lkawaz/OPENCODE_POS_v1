@@ -6,10 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Sale;
 use App\Models\Setting;
 use Mike42\Escpos\Printer;
-use Mike42\Escpos\EscposImage;
-use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
 use Mike42\Escpos\PrintConnectors\FilePrintConnector;
-use Mike42\Escpos\PrintConnectors\NetworkPrintConnector;
 
 class PrintController extends Controller
 {
@@ -96,32 +93,20 @@ class PrintController extends Controller
         $charWidth = $this->getCharWidth($printerType);
 
         try {
-            // Get printer name from settings or use default
-            $printerName = $settings['printer_name'] ?? 'POS58';
-            
-            // Create connector - try Windows printer first, then network
-            $connector = $this->createConnector($printerName);
-            
-            // Create printer instance
-            $printer = new Printer($connector);
-            
-            // Set encoding for Arabic support
-            $printer->setEncoding('UTF-8');
-            
-            // Print receipt
-            $this->printReceiptContent($printer, $sale, $settings, $charWidth);
-            
-            // Cut paper
-            $printer->cut();
-            
-            // Close printer
-            $printer->close();
-            
+            $printerName = $settings['printer_name'] ?? 'XP-80';
+
+            $tempFile = $this->buildReceiptFile(function ($printer) use ($sale, $settings, $charWidth) {
+                $this->printReceiptContent($printer, $sale, $settings, $charWidth);
+                $printer->cut();
+            });
+
+            $this->sendFileToPrinter($tempFile, $printerName);
+
             return response()->json([
                 'success' => true,
                 'message' => 'تم طباعة الفاتورة بنجاح'
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -131,21 +116,76 @@ class PrintController extends Controller
     }
 
     /**
-     * Create print connector based on printer configuration
+     * Write ESC/POS bytes to a temp file via FilePrintConnector.
+     * Returns the path of the written file.
      */
-    private function createConnector($printerName)
+    private function buildReceiptFile(callable $printCallback): string
     {
-        // Try Windows printer first
-        try {
-            return new WindowsPrintConnector($printerName);
-        } catch (\Exception $e) {
-            // If Windows connector fails, try network connector
-            // Default network printer IP - configure based on your setup
-            $printerIp = '192.168.1.100';
-            $printerPort = 9100;
-            
-            return new NetworkPrintConnector($printerIp, $printerPort);
+        $tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pos_receipt_' . uniqid() . '.bin';
+        $connector = new FilePrintConnector($tempFile);
+        $printer = new Printer($connector);
+        $printCallback($printer);
+        $printer->close();
+        return $tempFile;
+    }
+
+    /**
+     * Send a binary file to a local USB printer using Windows copy /b.
+     * Resolves the printer's USB port via WMIC so sharing is NOT required.
+     */
+    private function sendFileToPrinter(string $tempFile, string $printerName): void
+    {
+        $ps = realpath(base_path('electron/rawprint.ps1'));
+
+        $cmd = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'
+             . $ps . '" -PrinterName "' . addslashes($printerName)
+             . '" -FilePath "' . addslashes($tempFile) . '" 2>&1';
+
+        exec($cmd, $output, $code);
+        @unlink($tempFile);
+
+        if ($code !== 0) {
+            throw new \Exception('فشل الطباعة: ' . implode(' ', $output));
         }
+    }
+
+    /**
+     * Get the Windows port name (e.g. USB001) for a printer via WMIC.
+     * Returns the raw port string regardless of prefix so we can debug it.
+     */
+    private function getWindowsPrinterPort(string $printerName): ?string
+    {
+        $escaped = str_replace("'", "\\'", $printerName);
+        $cmd = 'wmic printer where "Name=\'' . $escaped . '\'" get PortName /format:value 2>&1';
+        exec($cmd, $lines);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (stripos($line, 'PortName=') === 0) {
+                $port = trim(substr($line, 9));
+                if ($port !== '') {
+                    return $port;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Debug: return printer port and file info without actually printing.
+     * Hit GET /print/debug/{name} in browser to check.
+     */
+    public function debugPrinter($printerName = 'XP-80')
+    {
+        $port  = $this->getWindowsPrinterPort($printerName);
+        $host  = php_uname('n');
+        $wmic  = 'wmic printer where "Name=\'' . $printerName . '\'" get PortName /format:value';
+        exec($wmic . ' 2>&1', $wmicOut);
+        return response()->json([
+            'printer_name' => $printerName,
+            'resolved_port' => $port,
+            'hostname'      => $host,
+            'wmic_output'   => $wmicOut,
+        ]);
     }
 
     /**
@@ -164,7 +204,7 @@ class PrintController extends Controller
         
         // Receipt header from settings (if exists)
         if (!empty($settings['receipt_header'])) {
-            $printer->setTextSize(0, 0);
+            $printer->setTextSize(1, 1);
             $printer->text($this->formatText($settings['receipt_header'], $charWidth, 'center') . "\n");
         }
         
@@ -179,7 +219,7 @@ class PrintController extends Controller
         // ==================== INVOICE INFO ====================
         
         $printer->setJustification(Printer::JUSTIFY_LEFT);
-        $printer->setTextSize(0, 0);
+        $printer->setTextSize(1, 1);
         
         // Invoice number
         $printer->text($this->formatText('رقم الفاتورة: ' . $sale->invoice_number, $charWidth) . "\n");
@@ -201,7 +241,7 @@ class PrintController extends Controller
         
         // ==================== ITEMS HEADER ====================
         
-        $printer->setTextSize(0, 0);
+        $printer->setTextSize(1, 1);
         
         // Item header based on paper size
         if ($printerType === self::PAPER_58MM) {
@@ -265,7 +305,7 @@ class PrintController extends Controller
         $printer->setTextSize(1, 1);
         $printer->text($this->formatText('الاجمالي: ', 20) . $this->formatText(number_format($sale->total, 2), 20) . "\n");
         
-        $printer->setTextSize(0, 0);
+        $printer->setTextSize(1, 1);
         
         // Separator
         $printer->text($this->createSeparator($charWidth) . "\n");
@@ -303,7 +343,7 @@ class PrintController extends Controller
         
         if (!empty($settings['receipt_footer'])) {
             $printer->setJustification(Printer::JUSTIFY_CENTER);
-            $printer->setTextSize(0, 0);
+            $printer->setTextSize(1, 1);
             $printer->text($this->formatText($settings['receipt_footer'], $charWidth, 'center') . "\n");
             $printer->text("\n");
         }
@@ -335,20 +375,19 @@ class PrintController extends Controller
         $charWidth = $this->getCharWidth($printerType);
 
         try {
-            $connector = $this->createConnector('POS58');
-            $printer = new Printer($connector);
-            
-            $printer->setEncoding('UTF-8');
-            $printer->setJustification(Printer::JUSTIFY_CENTER);
-            $printer->setTextSize(1, 1);
-            
-            $printer->text($this->formatText('اختبار الطابعة', $charWidth, 'center') . "\n");
-            $printer->text($this->formatText('Test Print', $charWidth, 'center') . "\n");
-            
-            $printer->feed(3);
-            $printer->cut();
-            $printer->close();
-            
+            $printerName = $settings['printer_name'] ?? 'XP-80';
+
+            $tempFile = $this->buildReceiptFile(function ($printer) use ($charWidth) {
+                $printer->setJustification(Printer::JUSTIFY_CENTER);
+                $printer->setTextSize(1, 1);
+                $printer->text($this->formatText('اختبار الطابعة', $charWidth, 'center') . "\n");
+                $printer->text($this->formatText('Test Print', $charWidth, 'center') . "\n");
+                $printer->feed(3);
+                $printer->cut();
+            });
+
+            $this->sendFileToPrinter($tempFile, $printerName);
+
             return response()->json([
                 'success' => true,
                 'message' => 'تم اختبار الطابعة بنجاح'

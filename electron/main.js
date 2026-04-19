@@ -207,31 +207,31 @@ function createTray() {
     });
 }
 
-ipcMain.on('window-minimize', () => {
-    if (mainWindow) mainWindow.minimize();
-});
-
-ipcMain.on('window-maximize', () => {
-    if (mainWindow) {
-        if (mainWindow.isMaximized()) {
-            mainWindow.unmaximize();
-        } else {
-            mainWindow.maximize();
-        }
-    }
-});
-
-ipcMain.on('window-close', () => {
-    if (mainWindow) mainWindow.hide();
-});
-
-ipcMain.handle('window-is-maximized', () => {
-    return mainWindow ? mainWindow.isMaximized() : false;
-});
-
 app.whenReady().then(() => {
     createWindow();
     createTray();
+
+    ipcMain.on('window-minimize', () => {
+        if (mainWindow) mainWindow.minimize();
+    });
+
+    ipcMain.on('window-maximize', () => {
+        if (mainWindow) {
+            if (mainWindow.isMaximized()) {
+                mainWindow.unmaximize();
+            } else {
+                mainWindow.maximize();
+            }
+        }
+    });
+
+    ipcMain.on('window-close', () => {
+        if (mainWindow) mainWindow.hide();
+    });
+
+    ipcMain.handle('window-is-maximized', () => {
+        return mainWindow ? mainWindow.isMaximized() : false;
+    });
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

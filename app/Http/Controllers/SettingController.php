@@ -17,12 +17,13 @@ class SettingController extends Controller
     public function update(Request $request, Setting $setting)
     {
         $validated = $request->validate([
-            'store_name' => 'nullable|string|max:255',
-            'printer_type' => 'nullable|string|max:20',
+            'store_name'     => 'nullable|string|max:255',
+            'printer_type'   => 'nullable|string|max:20',
+            'printer_name'   => 'nullable|string|max:255',
             'receipt_header' => 'nullable|string',
             'receipt_footer' => 'nullable|string',
-            'vat_number' => 'nullable|string|max:50',
-            'currency_symbol' => 'nullable|string|max:10',
+            'vat_number'     => 'nullable|string|max:50',
+            'currency_symbol'=> 'nullable|string|max:10',
         ]);
 
         $setting = Setting::first() ?? new Setting();

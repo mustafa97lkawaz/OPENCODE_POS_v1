@@ -13,9 +13,9 @@
         "hot": "mix watch --hot",
         "prod": "npm run production",
         "production": "mix --production",
-        "electron:start": "electron .",
+        "electron:start": "set ELECTRON_RUN_AS_NODE=&& electron .",
         "electron:build": "electron-builder --win --x64",
-        "launch": "node launcher.js"
+        "launch": "set ELECTRON_RUN_AS_NODE=&& node launcher.js"
     },
     "devDependencies": {
         "@popperjs/core": "^2.10.2",

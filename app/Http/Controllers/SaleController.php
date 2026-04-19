@@ -155,6 +155,10 @@ class SaleController extends Controller
             }
         }
 
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'sale_id' => $sale->id]);
+        }
+
         session()->flash('Add', 'تم اكمال البيع بنجاح');
         return redirect()->back();
     }

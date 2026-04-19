@@ -84,6 +84,7 @@
                                         <td>{{ $sale->created_at }}</td>
                                         <td>
                                             <button class="btn btn-outline-primary btn-sm" data-id="{{ $sale->id }}" data-toggle="modal" data-target="#view_sale">عرض</button>
+                                            <button class="btn btn-outline-success btn-sm btn-reprint" data-id="{{ $sale->id }}" title="طباعة الفاتورة"><i class="fe fe-printer"></i></button>
                                             <a href="{{ route('sales.return', $sale->id) }}" class="btn btn-outline-warning btn-sm">مرتجعات</a>
                                             <button class="btn btn-outline-danger btn-sm"
                                                 data-id="{{ $sale->id }}"
@@ -183,5 +184,27 @@
             modal.find('.modal-body #invoice_number').val(invoice);
             modal.find('#deleteForm').attr('action', '{{ route("sales.index") }}/' + id);
         })
+
+        // Reprint button
+        $(document).on('click', '.btn-reprint', function () {
+            var id = $(this).data('id');
+            var btn = $(this).prop('disabled', true);
+            $.get('{{ url("print/receipt") }}/' + id, function (res) {
+                var type = res.success ? 'success' : 'danger';
+                showSalesToast(res.message, type);
+                btn.prop('disabled', false);
+            }).fail(function (xhr) {
+                var msg = xhr.responseJSON ? xhr.responseJSON.message : 'تعذّرت الطباعة';
+                showSalesToast(msg, 'danger');
+                btn.prop('disabled', false);
+            });
+        });
+
+        function showSalesToast(message, type) {
+            var id = 'salesToast_' + Date.now();
+            var toast = $('<div id="' + id + '" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;min-width:260px;" class="alert alert-' + type + ' text-center shadow">' + message + '</div>');
+            $('body').append(toast);
+            setTimeout(function () { $('#' + id).fadeOut(400, function () { $(this).remove(); }); }, 3000);
+        }
     </script>
 @endsection
