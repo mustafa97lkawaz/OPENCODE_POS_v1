@@ -13,3 +13,8 @@ npm-debug.log
 yarn-error.log
 /.idea
 /.vscode
+
+# Large build artifacts
+dist/
+electron-app/node_modules/
+node_modules/electron/dist/
