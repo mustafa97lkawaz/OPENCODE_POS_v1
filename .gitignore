@@ -14,7 +14,13 @@ yarn-error.log
 /.idea
 /.vscode
 
-# Large build artifacts
+# Large build artifacts & binaries
 dist/
+build/
 electron-app/node_modules/
-node_modules/electron/dist/
+node_modules/
+*.exe
+*.dll
+*.pak
+*.bin
+*.asar
