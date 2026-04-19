@@ -88,4 +88,9 @@ class Products extends Model
     {
         return $this->hasMany('App\Models\StockAdjustment');
     }
+
+    public function productVariations()
+    {
+        return $this->hasMany('App\Models\ProductVariation', 'product_id');
+    }
 }

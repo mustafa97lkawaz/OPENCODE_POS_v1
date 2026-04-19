@@ -271,14 +271,14 @@ class SaleController extends Controller
     public function getProductByBarcode($barcode)
     {
         // First search in product barcode
-        $product = Products::with('category', 'variations')
+        $product = Products::with('category', 'productVariations')
             ->where('Status', 'مفعل')
             ->where('barcode', $barcode)
             ->first();
-        
+
         // If not found, search in variations barcode
         if (!$product) {
-            $variation = \App\Models\ProductVariation::with('product.category', 'product.variations')
+            $variation = \App\Models\ProductVariation::with('product.category', 'product.productVariations')
                 ->where('barcode', $barcode)
                 ->first();
             

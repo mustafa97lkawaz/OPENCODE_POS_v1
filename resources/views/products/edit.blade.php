@@ -383,7 +383,8 @@
                                     <label>الحالة</label>
                                     <br>
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="is_active" id="is_active" {{ $product->is_active ? 'checked' : '' }}>
+                                        <input type="hidden" name="is_active" value="0">
+                                        <input type="checkbox" name="is_active" id="is_active" value="1" {{ $product->is_active ? 'checked' : '' }}>
                                         <span class="toggle-slider"></span>
                                     </label>
                                 </div>

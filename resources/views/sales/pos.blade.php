@@ -662,21 +662,20 @@
         // Handle barcode scan
         function handleBarcodeScan(barcode) {
             $.ajax({
-                url: '{{ url("pos/products/barcode") }}/' + barcode,
+                url: '{{ url("pos/products/barcode") }}/' + barcode.trim(),
                 type: 'GET',
                 success: function(response) {
                     if (response.success) {
-                        addToCart(response.product.id);
-                        $('#productSearch').val('');
-                        loadProducts(selectedCategory);
+                        var p = response.product;
+                        addToCartDirect(p.id, p.Product_name, parseFloat(p.sell_price), parseInt(p.stock_qty) || 0);
                     } else {
                         alert(response.message || 'المنتج غير موجود!');
-                        $('#productSearch').val('');
                     }
+                    $('#productSearch').val('').focus();
                 },
                 error: function() {
                     alert('المنتج غير موجود!');
-                    $('#productSearch').val('');
+                    $('#productSearch').val('').focus();
                 }
             });
         }
