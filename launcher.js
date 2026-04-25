@@ -71,16 +71,21 @@ async function waitForServices() {
 
 async function main() {
     log('=== POS Launcher Started ===');
-    
-    if (checkXAMPP()) {
+
+    // Bundled PHP at electron/php/php.exe overrides XAMPP — Electron spawns its own server.
+    const bundledPhp = path.join(APP_PATH, 'electron', 'php', 'php.exe');
+    if (fs.existsSync(bundledPhp)) {
+        log('Bundled PHP detected — skipping XAMPP entirely (Electron will spawn its own server).');
+    } else if (checkXAMPP()) {
+        // Legacy fallback: app served by Apache, DB is SQLite (M2) so MySQL is no longer needed.
         startApache();
-        startMySQL();
         await waitForServices();
+    } else {
+        log('WARNING: No bundled PHP and no XAMPP. App will not load.');
     }
-    
+
     startElectron();
-    
-    log('=== All services started ===');
+    log('=== Launcher done ===');
 }
 
 main().catch(err => {

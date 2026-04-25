@@ -24,3 +24,8 @@ node_modules/
 *.pak
 *.bin
 *.asar
+
+# Bundled portable PHP — every dev fetches their own (~30 MB)
+/electron/php/*
+!/electron/php/README.md
+!/electron/php/.gitkeep

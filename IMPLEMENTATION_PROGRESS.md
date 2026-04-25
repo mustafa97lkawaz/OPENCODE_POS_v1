@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | M1 | Lock down data integrity | ✅ | 2026-04-25 | Password sanitized in `.env` + docs; user must replace with new App Password |
 | M2 | Drop XAMPP, switch to SQLite | ✅ | 2026-04-25 | MySQL no longer needed; Apache still required until M3 |
-| M3 | Bundle PHP into Electron | ⬜ | — | — |
+| M3 | Bundle PHP into Electron | ✅ | 2026-04-25 | PHP 8.2.30 NTS x64 bundled; Laravel served end-to-end at 127.0.0.1:8123 |
 | M4 | Move printing to queued job | ⬜ | — | — |
 | M5 | Refactor god view + extract POS JS | ⬜ | — | — |
 | M6 | FormRequests + foreign keys + schema cleanup | ⬜ | — | — |
@@ -46,13 +46,13 @@
 - [x] 2.4 `php artisan migrate:fresh --seed` — 25 migrations + 7 seeders ran clean
 - [x] 2.5 (bonus) Made `ExpenseController` date functions driver-portable (`MONTH()`/`WEEK()` → `strftime()` on SQLite)
 
-### M3 — Bundle PHP into Electron ⬜
-- [ ] 3.1 Download portable PHP 8.2 NTS into `electron/php/`
-- [ ] 3.2 Spawn PHP from Electron `main.js`
-- [ ] 3.3 Update `createWindow()` to take URL
-- [ ] 3.4 Update `.env` APP_URL to `127.0.0.1:8123`
-- [ ] 3.5 Update `electron-builder` to include PHP + storage
-- [ ] 3.6 Bundle test on clean VM
+### M3 — Bundle PHP into Electron ✅
+- [x] 3.1 Downloaded PHP 8.2.30 NTS Win64 (~30 MB) → extracted into `electron/php/` (82 MB). `php.ini` configured with extensions: gd, mbstring, pdo_sqlite, sqlite3, openssl, fileinfo, curl, intl. `php -m` confirms all loaded.
+- [x] 3.2 `electron/main.js` — `startPhpServer()` auto-detects bundled PHP, spawns it on free port 8123-8200, polls until ready, gracefully falls back to XAMPP URL if missing
+- [x] 3.3 `createWindow(loadUrl)` now takes URL parameter
+- [x] 3.4 `APP_URL` injected via spawn env (cleaner than editing `.env` — Laravel `env()` reads it dynamically)
+- [x] 3.5 `package.json` `build` block extended: bundles `app/`, `bootstrap/`, `config/`, `database/`, `public/`, `resources/`, `routes/`, `storage/`, `vendor/`, `artisan`, `server.php`, `.env`. `electron/php/**` and `database/database.sqlite` added to `asarUnpack` so PHP and DB live as real files on disk
+- [x] 3.6 End-to-end smoke test: spawned bundled PHP via `php.exe -S 127.0.0.1:8123 -t public server.php` → `GET /` returned HTTP 200 with Laravel login HTML, `GET /home` returned HTTP 302 (auth redirect). **Clean-VM install test deferred until first packaged build.**
 
 ### M4 — Move printing to queued job ⬜
 - [ ] 4.1 Set up database queue
@@ -122,3 +122,11 @@
 | 2026-04-25 | M2        | `php artisan migrate:fresh --seed --force` succeeded — 25 tables, 1 admin user, 16 products, 6 categories, 3 customers, 3 suppliers, 8 expense categories, 14 permissions, 5 roles |
 | 2026-04-25 | M2        | Made `ExpenseController` MONTH()/WEEK() driver-portable using `DB::connection()->getDriverName()` switch to `strftime()` for sqlite |
 | 2026-04-25 | M2        | Smoke test: `User::count()=1`, `Products::count()=16`, `DB::connection()->getDriverName()=sqlite`. **M2 complete.** |
+| 2026-04-25 | M3        | `electron/main.js` rewritten: portable-PHP detection + spawn on free port 8123-8200 + readiness polling + graceful XAMPP fallback + cleanup on quit. `createWindow()` takes URL. APP_URL injected via spawn env. |
+| 2026-04-25 | M3        | `package.json` electron-builder config: bundle full Laravel app + vendor + storage; `asarUnpack` for PHP, SQLite DB, storage, uploads. |
+| 2026-04-25 | M3        | Created `electron/php/` directory with detailed README for the PHP download / php.ini setup. |
+| 2026-04-25 | M3        | `.gitignore` updated: `electron/php/*` excluded except README. Bundle won't get committed. |
+| 2026-04-25 | M3        | `launcher.js` updated: skip XAMPP entirely when bundled PHP exists; skip MySQL always (we're on SQLite). |
+| 2026-04-25 | M3        | `node --check electron/main.js` passes; `package.json` JSON valid. |
+| 2026-04-25 | M3        | Downloaded PHP 8.2.30 NTS Win64 from windows.php.net (31.8 MB), extracted into `electron/php/` (82 MB), copied `php.ini-development` → `php.ini`, enabled gd/mbstring/pdo_sqlite/sqlite3/openssl/fileinfo/curl/intl. |
+| 2026-04-25 | M3        | Smoke test: bundled `php.exe -S 127.0.0.1:8123 -t public server.php` served Laravel login (HTTP 200) and `/home` redirect (HTTP 302). End-to-end SQLite+bundled-PHP+Laravel chain validated. **M3 complete.** |

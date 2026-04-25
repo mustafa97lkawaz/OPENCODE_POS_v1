@@ -1,19 +1,95 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
-const url = require('url');
+const fs = require('fs');
+const net = require('net');
+const http = require('http');
+const { spawn } = require('child_process');
 
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let phpServer = null;
+let resolvedUrl = null;
 
-const LARAVEL_URL = 'http://localhost/pos_opencodee/public';
-const FALLBACK_URLS = [
-    'http://localhost/pos_opencodee/public',
-    'http://127.0.0.1/pos_opencodee/public',
-    'http://localhost'
-];
+const XAMPP_URL = 'http://localhost/pos_opencodee/public';
 
-function createWindow() {
+// app.getAppPath() works both in dev (project root) and packaged (asar root).
+// In packaged builds, electron/php/** must be in asarUnpack so php.exe is on disk.
+function projectRoot() {
+    return app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked') : app.getAppPath();
+}
+
+function bundledPhpPath() {
+    return path.join(projectRoot(), 'electron', 'php', 'php.exe');
+}
+
+function findFreePort(start = 8123, end = 8200) {
+    return new Promise((resolve, reject) => {
+        const tryPort = (p) => {
+            if (p > end) return reject(new Error('No free port in ' + start + '-' + end));
+            const srv = net.createServer();
+            srv.once('error', () => tryPort(p + 1));
+            srv.once('listening', () => srv.close(() => resolve(p)));
+            srv.listen(p, '127.0.0.1');
+        };
+        tryPort(start);
+    });
+}
+
+function waitForHttp(url, timeoutMs = 15000) {
+    const start = Date.now();
+    return new Promise((resolve, reject) => {
+        const ping = () => {
+            const req = http.get(url, (res) => {
+                res.resume();
+                resolve();
+            });
+            req.on('error', () => {
+                if (Date.now() - start > timeoutMs) return reject(new Error('PHP server never came up at ' + url));
+                setTimeout(ping, 250);
+            });
+            req.setTimeout(1000, () => req.destroy());
+        };
+        ping();
+    });
+}
+
+async function startPhpServer() {
+    const phpExe = bundledPhpPath();
+    if (!fs.existsSync(phpExe)) {
+        console.log('[PHP] No bundled PHP at', phpExe, '— falling back to XAMPP URL');
+        return XAMPP_URL;
+    }
+
+    const port = await findFreePort(8123, 8200);
+    const root = projectRoot();
+    const url = `http://127.0.0.1:${port}`;
+    console.log('[PHP] Spawning bundled PHP on', url);
+
+    phpServer = spawn(phpExe, ['-S', `127.0.0.1:${port}`, '-t', 'public', 'server.php'], {
+        cwd: root,
+        windowsHide: true,
+        env: {
+            ...process.env,
+            APP_URL: url,             // override .env so Laravel asset() URLs are correct
+            APP_DEBUG: 'false',
+        },
+    });
+    phpServer.stdout.on('data', d => console.log('[PHP]', d.toString().trimEnd()));
+    phpServer.stderr.on('data', d => console.error('[PHP-err]', d.toString().trimEnd()));
+    phpServer.on('exit', code => console.log('[PHP] exited with code', code));
+
+    try {
+        await waitForHttp(url + '/');
+        return url;
+    } catch (err) {
+        console.error('[PHP]', err.message);
+        if (phpServer) { phpServer.kill(); phpServer = null; }
+        return XAMPP_URL; // graceful fallback
+    }
+}
+
+function createWindow(loadUrl) {
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -28,7 +104,7 @@ function createWindow() {
         show: false
     });
 
-    mainWindow.loadURL(LARAVEL_URL);
+    mainWindow.loadURL(loadUrl);
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
@@ -66,7 +142,7 @@ function createMenu() {
                 {
                     label: 'Open in Browser',
                     click: () => {
-                        shell.openExternal(LARAVEL_URL);
+                        if (resolvedUrl) shell.openExternal(resolvedUrl);
                     }
                 },
                 { type: 'separator' },
@@ -144,7 +220,7 @@ function createMenu() {
                 {
                     label: 'Open Laravel Server',
                     click: () => {
-                        shell.openExternal(LARAVEL_URL);
+                        if (resolvedUrl) shell.openExternal(resolvedUrl);
                     }
                 }
             ]
@@ -207,8 +283,9 @@ function createTray() {
     });
 }
 
-app.whenReady().then(() => {
-    createWindow();
+app.whenReady().then(async () => {
+    resolvedUrl = await startPhpServer();
+    createWindow(resolvedUrl);
     createTray();
 
     ipcMain.on('window-minimize', () => {
@@ -235,7 +312,7 @@ app.whenReady().then(() => {
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
+            createWindow(resolvedUrl);
         }
     });
 });
@@ -248,6 +325,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (phpServer) {
+        try { phpServer.kill(); } catch (e) { /* ignore */ }
+        phpServer = null;
+    }
 });
 
 app.setLoginItemSettings({

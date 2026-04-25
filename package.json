@@ -40,7 +40,40 @@
             "output": "dist"
         },
         "files": [
-            "electron/**/*"
+            "electron/**/*",
+            "app/**/*",
+            "bootstrap/**/*",
+            "config/**/*",
+            "database/**/*",
+            "public/**/*",
+            "resources/**/*",
+            "routes/**/*",
+            "storage/**/*",
+            "vendor/**/*",
+            "artisan",
+            "server.php",
+            ".env",
+            "!storage/logs/*",
+            "!storage/framework/cache/data/*",
+            "!storage/framework/sessions/*",
+            "!storage/framework/views/*",
+            "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+            "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
+        ],
+        "asarUnpack": [
+            "electron/php/**/*",
+            "app/**/*",
+            "bootstrap/**/*",
+            "config/**/*",
+            "database/**/*",
+            "public/**/*",
+            "resources/**/*",
+            "routes/**/*",
+            "storage/**/*",
+            "vendor/**/*",
+            "artisan",
+            "server.php",
+            ".env"
         ],
         "win": {
             "target": [
