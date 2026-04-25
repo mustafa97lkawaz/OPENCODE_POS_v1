@@ -15,11 +15,11 @@ class AddFieldsToExpensesTable extends Migration
     {
         Schema::table('expenses', function (Blueprint $table) {
             $table->string('reference_number')->nullable()->after('Expense_name');
-            $table->enum('payment_method', ['cash', 'card', 'bank'])->default('cash')->after('reference_number');
+            $table->string('payment_method', 10)->default('cash')->after('reference_number');
             $table->string('attachment')->nullable()->after('payment_method');
             $table->boolean('recurring')->default(false)->after('attachment');
-            $table->enum('recurring_type', ['daily', 'weekly', 'monthly'])->nullable()->after('recurring');
-            $table->enum('status', ['paid', 'pending'])->default('paid')->after('recurring_type');
+            $table->string('recurring_type', 10)->nullable()->after('recurring');
+            $table->string('status', 10)->default('paid')->after('recurring_type');
         });
     }
 

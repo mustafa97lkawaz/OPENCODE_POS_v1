@@ -57,9 +57,14 @@ class ExpenseController extends Controller
         $paidExpenses = $expenses->where('status', 'paid')->sum('amount');
         $pendingExpenses = $expenses->where('status', 'pending')->sum('amount');
 
+        // Driver-portable date helpers (SQLite vs MySQL)
+        $driver  = DB::connection()->getDriverName();
+        $monthFn = $driver === 'sqlite' ? "CAST(strftime('%m', expense_date) AS INTEGER)" : 'MONTH(expense_date)';
+        $weekFn  = $driver === 'sqlite' ? "CAST(strftime('%W', expense_date) AS INTEGER)" : 'WEEK(expense_date)';
+
         // Monthly summary for the current year
         $monthlyExpenses = Expense::select(
-            DB::raw('MONTH(expense_date) as month'),
+            DB::raw("$monthFn as month"),
             DB::raw('SUM(amount) as total')
         )
         ->whereYear('expense_date', date('Y'))
@@ -69,7 +74,7 @@ class ExpenseController extends Controller
 
         // Weekly summary for the current month
         $weeklyExpenses = Expense::select(
-            DB::raw('WEEK(expense_date) as week'),
+            DB::raw("$weekFn as week"),
             DB::raw('SUM(amount) as total')
         )
         ->whereMonth('expense_date', date('m'))

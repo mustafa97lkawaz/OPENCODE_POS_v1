@@ -18,7 +18,7 @@ class CreateStockAdjustmentsTable extends Migration
             $table->unsignedBigInteger('product_id');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
             $table->integer('qty_change');
-            $table->enum('type', ['damaged', 'expired', 'added', 'removed']);
+            $table->string('type', 20);
             $table->text('reason')->nullable();
             $table->string('Created_by', 999);
             $table->timestamps();

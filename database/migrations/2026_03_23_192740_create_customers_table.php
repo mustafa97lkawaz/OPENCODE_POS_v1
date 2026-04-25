@@ -19,7 +19,7 @@ class CreateCustomersTable extends Migration
             $table->string('phone', 50)->nullable();
             $table->string('email', 100)->nullable();
             $table->text('address')->nullable();
-            $table->enum('type', ['walk-in', 'account'])->default('walk-in');
+            $table->string('type', 20)->default('walk-in');
             $table->decimal('account_balance', 10, 2)->default(0);
             $table->string('Status', 50)->default('مفعل');
             $table->string('Created_by', 999);

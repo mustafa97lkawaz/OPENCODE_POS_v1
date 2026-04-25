@@ -22,7 +22,7 @@ class CreateSalesTable extends Migration
             $table->decimal('tax_amount', 10, 2)->default(0);
             $table->decimal('discount', 10, 2)->default(0);
             $table->decimal('total', 10, 2);
-            $table->enum('payment_method', ['cash', 'card', 'split'])->default('cash');
+            $table->string('payment_method', 10)->default('cash');
             $table->decimal('cash_amount', 10, 2)->default(0);
             $table->decimal('card_amount', 10, 2)->default(0);
             $table->decimal('paid_amount', 10, 2);

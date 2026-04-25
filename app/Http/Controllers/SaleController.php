@@ -103,56 +103,81 @@ class SaleController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'payment_method' => 'required',
+            'payment_method' => 'required|in:cash,card,split',
+            'items_json'     => 'required|json',
         ], [
             'payment_method.required' => 'يرجي اختيار طريقة الدفع',
+            'items_json.required'     => 'السلة فارغة',
         ]);
 
-        $invoice_number = 'INV-' . date('YmdHis');
+        $items = json_decode($request->items_json, true) ?: [];
+        if (empty($items)) {
+            return $request->ajax()
+                ? response()->json(['success' => false, 'message' => 'السلة فارغة'], 422)
+                : back()->withErrors(['cart' => 'السلة فارغة']);
+        }
 
-        $subtotal = $request->subtotal;
-        $tax_amount = $request->tax_amount ?? 0;
-        $discount = $request->discount ?? 0;
-        $total = $subtotal + $tax_amount - $discount;
+        try {
+            $sale = DB::transaction(function () use ($request, $items) {
+                $productIds = collect($items)->pluck('product_id')->all();
+                $products   = Products::whereIn('id', $productIds)
+                                  ->lockForUpdate()
+                                  ->get()
+                                  ->keyBy('id');
 
-        $payment_method = $request->payment_method;
-        $cash_amount = $request->cash_amount ?? 0;
-        $card_amount = $request->card_amount ?? 0;
-        $paid_amount = $cash_amount + $card_amount;
-        $change_due = $paid_amount > $total ? $paid_amount - $total : 0;
+                // Server-side stock validation — never trust the client
+                foreach ($items as $i) {
+                    $p = $products[$i['product_id']] ?? null;
+                    if (!$p) {
+                        throw new \Exception("منتج غير موجود: {$i['product_id']}");
+                    }
+                    if ($p->stock_qty < $i['qty']) {
+                        throw new \Exception("المخزون غير كافٍ: {$p->Product_name}");
+                    }
+                }
 
-        $sale = Sale::create([
-            'invoice_number'  => $invoice_number,
-            'customer_id'     => $request->customer_id,
-            'subtotal'        => $subtotal,
-            'tax_amount'      => $tax_amount,
-            'discount'        => $discount,
-            'total'           => $total,
-            'payment_method'  => $payment_method,
-            'cash_amount'     => $cash_amount,
-            'card_amount'     => $card_amount,
-            'paid_amount'     => $paid_amount,
-            'change_due'      => $change_due,
-            'Status'          => 'completed',
-            'Created_by'      => Auth::user()->name,
-        ]);
+                $subtotal   = (float) $request->subtotal;
+                $tax_amount = (float) ($request->tax_amount ?? 0);
+                $discount   = (float) ($request->discount ?? 0);
+                $total      = $subtotal + $tax_amount - $discount;
+                $cash       = (float) ($request->cash_amount ?? 0);
+                $card       = (float) ($request->card_amount ?? 0);
+                $paid       = $cash + $card;
 
-        $items = json_decode($request->items_json, true);
-        if ($items) {
-            foreach ($items as $item) {
-                SaleItem::create([
-                    'sale_id'     => $sale->id,
-                    'product_id'  => $item['product_id'],
-                    'qty'         => $item['qty'],
-                    'unit_price'  => $item['price'],
-                    'total'       => $item['qty'] * $item['price'],
+                $sale = Sale::create([
+                    'invoice_number' => 'INV-' . date('YmdHis'),
+                    'customer_id'    => $request->customer_id,
+                    'subtotal'       => $subtotal,
+                    'tax_amount'     => $tax_amount,
+                    'discount'       => $discount,
+                    'total'          => $total,
+                    'payment_method' => $request->payment_method,
+                    'cash_amount'    => $cash,
+                    'card_amount'    => $card,
+                    'paid_amount'    => $paid,
+                    'change_due'     => max(0, $paid - $total),
+                    'Status'         => 'completed',
+                    'Created_by'     => Auth::user()->name,
                 ]);
 
-                $product = Products::find($item['product_id']);
-                if ($product) {
-                    $product->decrement('stock_qty', $item['qty']);
+                foreach ($items as $i) {
+                    $p = $products[$i['product_id']];
+                    SaleItem::create([
+                        'sale_id'    => $sale->id,
+                        'product_id' => $p->id,
+                        'qty'        => $i['qty'],
+                        'unit_price' => $p->sell_price,            // server price, not client
+                        'total'      => $i['qty'] * $p->sell_price,
+                    ]);
+                    $p->decrement('stock_qty', $i['qty']);
                 }
-            }
+
+                return $sale;
+            });
+        } catch (\Throwable $e) {
+            return $request->ajax()
+                ? response()->json(['success' => false, 'message' => $e->getMessage()], 422)
+                : back()->withErrors(['cart' => $e->getMessage()]);
         }
 
         if ($request->ajax()) {
@@ -165,17 +190,23 @@ class SaleController extends Controller
 
     public function destroy(Request $request)
     {
-        $sale = Sale::with('saleItems')->find($request->id);
-        
-        if ($sale) {
+        DB::transaction(function () use ($request) {
+            $sale = Sale::with('saleItems')->lockForUpdate()->find($request->id);
+            if (!$sale) return;
+
+            $productIds = $sale->saleItems->pluck('product_id')->all();
+            $products   = Products::whereIn('id', $productIds)
+                              ->lockForUpdate()
+                              ->get()
+                              ->keyBy('id');
+
             foreach ($sale->saleItems as $item) {
-                $product = Products::find($item->product_id);
-                if ($product) {
-                    $product->increment('stock_qty', $item->qty);
+                if (isset($products[$item->product_id])) {
+                    $products[$item->product_id]->increment('stock_qty', $item->qty);
                 }
             }
             $sale->delete();
-        }
+        });
 
         session()->flash('delete', 'تم حذف البيع بنجاح');
         return redirect()->back();
