@@ -25,7 +25,7 @@
 | M5 | Refactor god view + extract POS JS | ✅ | 2026-04-25 | `pos.blade.php` 1011→322 lines; JS→`public/js/pos.js`; 4 partials; `show()`→Blade |
 | M6 | FormRequests + foreign keys + schema cleanup | ✅ | 2026-04-25 | 6 FormRequests; SuspendedSale model; FKs (set null + restrict) enforced on SQLite |
 | M7 | Convert vendor patch to subclass | ✅ | 2026-04-25 | `App\Print\SafeGdEscposImage`; `composer install` clean; print logic verified |
-| M8 | Delete dead theme views | ⬜ | — | — |
+| M8 | Delete dead theme views | ✅ | 2026-04-25 | 95 dead theme views + dead `AdminController` removed; views 3MB→1MB |
 | M9 | Tests | ⬜ | — | — |
 | M10 | Real installer + auto-update + backup | ⬜ | — | — |
 
@@ -95,9 +95,10 @@
 
 > **Finding:** upstream mike42/escpos-php **v2.2 already contains** the `\GdImage` check, so there was no longer an *active* break — but the subclass now **guarantees** correctness independent of vendor version/state and removes the fragile hand-edit. Goal met.
 
-### M8 — Theme cleanup ⬜
-- [ ] 8.1 List unused views
-- [ ] 8.2 Delete unused views
+### M8 — Theme cleanup ✅
+- [x] 8.1 Detected 95 unreferenced top-level theme-demo views. Root cause: their only consumer was `AdminController::index()` (`return view($id)`) via the `/{page}` wildcard route **removed in M1** — so all were already unreachable (and `return view($id)` was an arbitrary-view-render security smell).
+- [x] 8.2 `git rm` 95 views + the now-dead `app/Http/Controllers/AdminController.php`. `resources/views` 3MB→1MB. Remaining top-level views (still referenced): `404`, `home`, `products`.
+- [x] 8.3 Verified: `composer dump-autoload` clean, `route:list` 267 (unchanged), `/login` 200, `/random-deadpage` → **404 not 500** (no AdminController crash).
 
 ### M9 — Tests ⬜
 - [ ] 9.1 Test setup (in-memory SQLite)
@@ -168,3 +169,4 @@
 | 2026-04-25 | M6        | Fixed is_variant/is_featured checkboxes (products create/edit). |
 | 2026-04-25 | M6        | Verified: routes 267 unchanged, FormRequest validation works, FK restrict blocks sold-product delete (302 not 500). **M6 complete.** |
 | 2026-04-25 | M7        | Created App\Print\SafeGdEscposImage (full reimpl, PHP8 GdImage-safe); PrintController uses `new SafeGdEscposImage()`; composer install clean; raster test OK. **M7 complete.** |
+| 2026-04-25 | M8        | Removed 95 dead theme views + dead AdminController (orphaned by M1 wildcard removal). views 3MB->1MB. route:list 267 unchanged, /login 200, dead URL 404. **M8 complete.** |
