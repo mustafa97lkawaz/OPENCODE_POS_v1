@@ -26,7 +26,7 @@
 | M6 | FormRequests + foreign keys + schema cleanup | ✅ | 2026-04-25 | 6 FormRequests; SuspendedSale model; FKs (set null + restrict) enforced on SQLite |
 | M7 | Convert vendor patch to subclass | ✅ | 2026-04-25 | `App\Print\SafeGdEscposImage`; `composer install` clean; print logic verified |
 | M8 | Delete dead theme views | ✅ | 2026-04-25 | 95 dead theme views + dead `AdminController` removed; views 3MB→1MB |
-| M9 | Tests | ⬜ | — | — |
+| M9 | Tests | ✅ | 2026-04-25 | 11 tests pass (in-memory SQLite); pre-commit hook; caught + fixed a real variation-barcode recursion bug |
 | M10 | Real installer + auto-update + backup | ⬜ | — | — |
 
 ---
@@ -100,11 +100,13 @@
 - [x] 8.2 `git rm` 95 views + the now-dead `app/Http/Controllers/AdminController.php`. `resources/views` 3MB→1MB. Remaining top-level views (still referenced): `404`, `home`, `products`.
 - [x] 8.3 Verified: `composer dump-autoload` clean, `route:list` 267 (unchanged), `/login` 200, `/random-deadpage` → **404 not 500** (no AdminController crash).
 
-### M9 — Tests ⬜
-- [ ] 9.1 Test setup (in-memory SQLite)
-- [ ] 9.2 `SaleStoreTest`
-- [ ] 9.3 `BarcodeLookupTest`
-- [ ] 9.4 `PrintControllerTest`
+### M9 — Tests ✅
+- [x] 9.1 `phpunit.xml`: enabled `DB_CONNECTION=sqlite` / `DB_DATABASE=:memory:`; added `APP_URL=http://localhost` (the `.env` `APP_URL` has a `/pos_opencodee/public` subpath that broke test routing — testing-only override). Added `HasFactory` to `User`; `UserFactory` now sets the NOT-NULL `roles_name`.
+- [x] 9.2 `SaleStoreTest` — valid sale decrements stock + writes rows (server price used); oversell → 422, nothing written; missing payment_method → 422 (FormRequest); sequential second-sale oversell guard.
+- [x] 9.3 `BarcodeLookupTest` — product barcode; variation barcode → parent product; unknown → `success:false`.
+- [x] 9.4 `PrintControllerTest` — `getPrinters` returns array; `testPrint` returns well-formed JSON envelope (printer-presence is environment-dependent, asserted defensively).
+- [x] 9.5 `.git/hooks/pre-commit` runs `php artisan test --stop-on-failure`.
+- [x] **Bug caught & fixed:** variation-barcode lookup returned HTTP 500 ("Recursion detected" — `$variation` carried its `product` relation, creating a cycle when nested back onto `$product` for JSON). Fixed `SaleController::getProductByBarcode()` with `$variation->unsetRelation('product')`. **`php artisan test` → 11 passed.**
 
 ### M10 — Distribution polish ⬜
 - [ ] 10.1 Switch electron-builder target to NSIS installer
@@ -170,3 +172,4 @@
 | 2026-04-25 | M6        | Verified: routes 267 unchanged, FormRequest validation works, FK restrict blocks sold-product delete (302 not 500). **M6 complete.** |
 | 2026-04-25 | M7        | Created App\Print\SafeGdEscposImage (full reimpl, PHP8 GdImage-safe); PrintController uses `new SafeGdEscposImage()`; composer install clean; raster test OK. **M7 complete.** |
 | 2026-04-25 | M8        | Removed 95 dead theme views + dead AdminController (orphaned by M1 wildcard removal). views 3MB->1MB. route:list 267 unchanged, /login 200, dead URL 404. **M8 complete.** |
+| 2026-04-25 | M9        | phpunit :memory: + APP_URL fix; User HasFactory; UserFactory roles_name. 3 test files (SaleStore, BarcodeLookup, PrintController). pre-commit hook. Fixed variation-barcode recursion 500. **11 passed. M9 complete.** |

@@ -251,6 +251,9 @@ class SaleController extends Controller
             
             if ($variation) {
                 $product = $variation->product;
+                // Drop the back-reference to product before nesting the variation
+                // onto the product, otherwise JSON encoding hits "Recursion detected".
+                $variation->unsetRelation('product');
                 $product->selected_variation = $variation;
             }
         }
