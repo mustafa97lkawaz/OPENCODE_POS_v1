@@ -16,7 +16,8 @@ yarn-error.log
 
 # Large build artifacts & binaries
 dist/
-build/
+build/*
+!build/icon.png
 electron-app/node_modules/
 node_modules/
 *.exe
