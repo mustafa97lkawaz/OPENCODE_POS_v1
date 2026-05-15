@@ -5,8 +5,15 @@
 <!-- Maps css -->
 <link href="{{URL::asset('assets/plugins/jqvmap/jqvmap.min.css')}}" rel="stylesheet">
 <style>
-    /* Dashboard — uniform stat cards */
+    /* Dashboard — strictly uniform stat cards (true flex equal-height) */
+    .dash-col {
+        display: flex;            /* let the card stretch to the row's tallest */
+        margin-bottom: 1.5rem;
+    }
     .dash-card {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
         height: 100%;
         margin-bottom: 0;
         border: 0;
@@ -20,8 +27,8 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, .10);
     }
     .dash-card .card-body {
-        padding: 1.5rem;
-        min-height: 132px;
+        flex: 1 1 auto;
+        padding: 1.25rem 1.5rem;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -30,12 +37,19 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 12px;
     }
+    .dash-row > div:first-child { min-width: 0; flex: 1 1 auto; }
     .dash-label {
         font-size: 14px;
         color: #8f9bb3;
         font-weight: 600;
-        margin-bottom: 6px;
+        margin: 0 0 6px;
+        /* reserve 2 lines so values line up whether the title wraps or not */
+        min-height: 38px;
+        line-height: 19px;
+        display: flex;
+        align-items: flex-end;
     }
     .dash-value {
         font-size: 24px;
@@ -55,13 +69,12 @@
     }
     .dash-icon i { font-size: 22px; }
     .dash-foot {
-        margin-top: 12px;
+        margin-top: 14px;
         font-size: 13px;
         color: #8f9bb3;
         min-height: 18px;
     }
     .dash-foot b { color: #1c273c; }
-    .dash-col { margin-bottom: 1.5rem; }
 </style>
 @endsection
 @section('page-header')
