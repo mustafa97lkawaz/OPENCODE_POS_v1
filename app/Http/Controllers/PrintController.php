@@ -200,25 +200,45 @@ class PrintController extends Controller
         $printer->feed(3);
     }
 
-    public function printReceipt($saleId)
+    /**
+     * Render and physically print a sale receipt.
+     * THROWS on any failure — callers (HTTP action / queue job) handle the error.
+     * The queue worker relies on this throwing so retries & failed_jobs work.
+     */
+    public function renderSaleReceipt(int $saleId): void
     {
         $sale = Sale::with(['saleItems.product', 'customer'])->find($saleId);
-        if (!$sale)
-            return response()->json(['success' => false, 'message' => 'الفاتورة غير موجودة'], 404);
+        if (!$sale) {
+            throw new \RuntimeException("الفاتورة غير موجودة: {$saleId}");
+        }
 
         $settings  = $this->getPrinterSettings();
         $charWidth = $this->getCharWidth($settings['printer_type']);
 
-        try {
-            $tempFile = $this->buildReceiptFile(function ($printer) use ($sale, $settings, $charWidth) {
-                $this->printReceiptContent($printer, $sale, $settings, $charWidth);
-                $printer->cut();
-            });
-            $this->sendFileToPrinter($tempFile, $settings['printer_name']);
-            return response()->json(['success' => true, 'message' => 'تم طباعة الفاتورة بنجاح']);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'خطأ في الطباعة: ' . $e->getMessage()], 500);
+        $tempFile = $this->buildReceiptFile(function ($printer) use ($sale, $settings, $charWidth) {
+            $this->printReceiptContent($printer, $sale, $settings, $charWidth);
+            $printer->cut();
+        });
+        $this->sendFileToPrinter($tempFile, $settings['printer_name']);
+    }
+
+    /**
+     * HTTP entry point. Queues the print so a slow/offline printer never blocks
+     * the cashier. Returns immediately; the queue worker does the actual printing.
+     */
+    public function printReceipt($saleId)
+    {
+        if (!Sale::whereKey($saleId)->exists()) {
+            return response()->json(['success' => false, 'message' => 'الفاتورة غير موجودة'], 404);
         }
+
+        \App\Jobs\PrintReceiptJob::dispatch((int) $saleId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إرسال الفاتورة للطباعة',
+            'queued'  => true,
+        ]);
     }
 
     public function testPrint()

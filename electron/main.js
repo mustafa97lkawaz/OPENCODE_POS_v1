@@ -10,6 +10,7 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let phpServer = null;
+let queueWorker = null;
 let resolvedUrl = null;
 
 const XAMPP_URL = 'http://localhost/pos_opencodee/public';
@@ -158,11 +159,44 @@ async function startPhpServer() {
     try {
         await waitForHttp(url + '/');
         flog('[PHP] server is up at', url);
+        startQueueWorker(phpExe, root, dbPath);
         return url;
     } catch (err) {
         flog('[PHP] ERROR:', err.message);
         if (phpServer) { phpServer.kill(); phpServer = null; }
         return XAMPP_URL; // graceful fallback
+    }
+}
+
+// Background queue worker: drains the `jobs` table (printing runs here so a
+// slow/offline thermal printer never blocks the cashier's sale request).
+function startQueueWorker(phpExe, root, dbPath) {
+    try {
+        queueWorker = spawn(
+            phpExe,
+            ['artisan', 'queue:work', '--queue=default', '--sleep=2', '--tries=3', '--backoff=5', '--timeout=60'],
+            {
+                cwd: root,
+                windowsHide: true,
+                env: {
+                    ...process.env,
+                    APP_DEBUG: 'false',
+                    DB_CONNECTION: 'sqlite',
+                    DB_DATABASE: dbPath,
+                    QUEUE_CONNECTION: 'database',
+                },
+            }
+        );
+        queueWorker.stdout.on('data', d => flog('[queue]', d.toString().trimEnd()));
+        queueWorker.stderr.on('data', d => flog('[queue-err]', d.toString().trimEnd()));
+        queueWorker.on('error', e => flog('[queue] spawn error:', e.message));
+        queueWorker.on('exit', code => {
+            flog('[queue] worker exited with code', code);
+            queueWorker = null;
+        });
+        flog('[queue] worker started');
+    } catch (e) {
+        flog('[queue] failed to start worker:', e.message);
     }
 }
 
@@ -409,6 +443,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (queueWorker) {
+        try { queueWorker.kill(); } catch (e) { /* ignore */ }
+        queueWorker = null;
+    }
     if (phpServer) {
         try { phpServer.kill(); } catch (e) { /* ignore */ }
         phpServer = null;

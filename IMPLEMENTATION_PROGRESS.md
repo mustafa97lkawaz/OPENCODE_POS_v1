@@ -21,7 +21,7 @@
 | M1 | Lock down data integrity | ✅ | 2026-04-25 | Password sanitized in `.env` + docs; user must replace with new App Password |
 | M2 | Drop XAMPP, switch to SQLite | ✅ | 2026-04-25 | MySQL no longer needed; Apache still required until M3 |
 | M3 | Bundle PHP into Electron | ✅ | 2026-04-25 | PHP 8.2.30 bundled; **packaged .exe verified end-to-end** (HTTP 200, full UI, no XAMPP/MySQL) |
-| M4 | Move printing to queued job | ⬜ | — | — |
+| M4 | Move printing to queued job | ✅ | 2026-04-25 | DB queue + `PrintReceiptJob`; Electron runs `queue:work`; retry→failed_jobs verified |
 | M5 | Refactor god view + extract POS JS | ⬜ | — | — |
 | M6 | FormRequests + foreign keys + schema cleanup | ⬜ | — | — |
 | M7 | Convert vendor patch to subclass | ⬜ | — | — |
@@ -64,11 +64,14 @@
 
 > ⚠️ **Test-harness note:** `ELECTRON_RUN_AS_NODE=1` is set in this machine's shell env. Launching the `.exe` from a shell that inherits it makes Electron run as bare Node and exit instantly. Normal double-click / the `electron:start` npm script (which clears the var) are unaffected.
 
-### M4 — Move printing to queued job ⬜
-- [ ] 4.1 Set up database queue
-- [ ] 4.2 Create `PrintReceiptJob`
-- [ ] 4.3 Dispatch from controller / sale flow
-- [ ] 4.4 Run worker from Electron
+### M4 — Move printing to queued job ✅
+- [x] 4.1 `.env` `QUEUE_CONNECTION=database`; `php artisan queue:table` → `2026_05_15_190322_create_jobs_table`; migrated (`jobs` + `failed_jobs` tables present)
+- [x] 4.2 `app/Jobs/PrintReceiptJob.php` — `$tries=3`, `$backoff=5`, `$timeout=60`, `failed()` logs to Laravel log
+- [x] 4.3 Refactored `PrintController`: new `renderSaleReceipt(int): void` does the work & **throws** on failure (so retries/failed_jobs work); `printReceipt()` HTTP action now `PrintReceiptJob::dispatch()` + returns instantly `{success, queued:true}`
+- [x] 4.4 `electron/main.js` — `startQueueWorker()` spawns bundled-PHP `artisan queue:work` after server is up; killed in `before-quit`
+- [x] 4.5 Verified: dispatch returns instantly (row in `jobs` immediately); worker processes; non-existent sale → 3 retries → lands in `failed_jobs` with real exception. Frontend unchanged (already fire-and-forget; queued message is more accurate).
+
+**Why this matters most after M3:** the bundled PHP built-in server (M3) is **single-threaded** — a synchronous multi-second print would freeze the *entire* POS for all requests. Queuing makes the sale request return in ms.
 
 ### M5 — Refactor god view + extract POS JS ⬜
 - [ ] 5.1 Extract JS to `public/js/pos.js`
@@ -144,3 +147,8 @@
 | 2026-04-25 | M3        | Fixed packaging: `"asar": false` (PHP can't read inside asar); excluded `public/storage` symlink; added `ensureWritableDirs()` + `ensureStorageLink()` (junction) at launch; portable `DB_DATABASE` via spawn env; file logger + crash handlers. |
 | 2026-04-25 | M3        | **Packaged `.exe` verified end-to-end:** clean rebuild, launched, `[dirs] created`, bundled PHP up, `resolvedUrl=http://127.0.0.1:8123`, window created, `GET /` → HTTP 200 full UI. No XAMPP/MySQL. **M3 complete.** |
 | 2026-04-25 | M10 (note)| Bundled SQLite DB resolves under install dir (read-only in real installs). Must relocate to `%APPDATA%` on first launch — flagged in M10.2. |
+| 2026-04-25 | M4        | `.env` `QUEUE_CONNECTION=database`; created + migrated `jobs` table; `failed_jobs` already present. |
+| 2026-04-25 | M4        | Created `app/Jobs/PrintReceiptJob.php` (tries=3, backoff=5, timeout=60, failed() logging). |
+| 2026-04-25 | M4        | Refactored `PrintController`: `renderSaleReceipt()` throws on failure; `printReceipt()` HTTP action dispatches the job & returns instantly. |
+| 2026-04-25 | M4        | `electron/main.js`: `startQueueWorker()` spawns bundled-PHP `queue:work`; killed on quit. |
+| 2026-04-25 | M4        | Verified: instant dispatch (row in `jobs`); worker drains; bad sale → 3 retries → `failed_jobs` w/ real exception. **M4 complete.** |
