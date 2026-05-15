@@ -67,7 +67,8 @@
             "target": [
                 "nsis"
             ],
-            "icon": "public/favicon.ico"
+            "icon": "build/icon.png",
+            "signAndEditExecutable": false
         },
         "nsis": {
             "oneClick": false,
