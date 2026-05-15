@@ -60,6 +60,7 @@ Route::group(['middleware' => ['auth']], function() {
     Route::get('print/debug/{name?}',         [PrintController::class, 'debugPrinter'])->name('print.debug');
 
     // Settings
+    Route::get('settings/backup', [App\Http\Controllers\SettingController::class, 'backup'])->name('settings.backup');
     Route::resource('settings', App\Http\Controllers\SettingController::class);
     
     // Reports

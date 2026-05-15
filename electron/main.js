@@ -45,44 +45,81 @@ function bundledPhpPath() {
     return path.join(projectRoot(), 'electron', 'php', 'php.exe');
 }
 
-// Laravel needs these writable dirs to exist; their contents are excluded from
-// the build (don't ship stale cache), so the empty dirs must be recreated at launch.
-function ensureWritableDirs() {
-    const root = projectRoot();
-    const dirs = [
-        'storage/framework/views',
-        'storage/framework/cache/data',
-        'storage/framework/sessions',
-        'storage/logs',
-        'storage/app/public',
-        'bootstrap/cache',
-    ];
-    for (const d of dirs) {
-        const full = path.join(root, ...d.split('/'));
-        try {
-            if (!fs.existsSync(full)) {
-                fs.mkdirSync(full, { recursive: true });
-                flog('[dirs] created', full);
+// The install dir is read-only (or wiped on update), so the DB and the writable
+// storage tree live in %APPDATA%\<app>. Seeds them from the bundle on first run.
+// Returns the per-user { dbPath, storagePath }. No-op-ish in dev (just ensures dirs).
+function prepareUserData() {
+    const root    = projectRoot();
+    const userDir = app.getPath('userData');               // %APPDATA%\POS Desktop
+    const dbPath  = path.join(userDir, 'database.sqlite');
+    const storage = path.join(userDir, 'storage');
+
+    try {
+        // First run: copy the seeded DB out of the bundle so the user keeps data
+        // across reinstalls / auto-updates.
+        if (!fs.existsSync(dbPath)) {
+            const seed = path.join(root, 'database', 'database.sqlite');
+            if (fs.existsSync(seed)) {
+                fs.copyFileSync(seed, dbPath);
+                flog('[userdata] seeded DB →', dbPath);
+            } else {
+                fs.writeFileSync(dbPath, '');
+                flog('[userdata] created empty DB →', dbPath);
             }
-        } catch (e) {
-            flog('[dirs] FAILED to create', full, '-', e.message);
         }
+    } catch (e) {
+        flog('[userdata] DB prepare FAILED:', e.message);
+    }
+
+    // Laravel's writable storage skeleton (contents excluded from build).
+    for (const d of [
+        'framework/views',
+        'framework/cache/data',
+        'framework/sessions',
+        'logs',
+        'app/public',
+    ]) {
+        const full = path.join(storage, ...d.split('/'));
+        try {
+            if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
+        } catch (e) {
+            flog('[userdata] mkdir FAILED', full, '-', e.message);
+        }
+    }
+    flog('[userdata] dbPath=' + dbPath, 'storagePath=' + storage);
+    return { dbPath, storagePath: storage };
+}
+
+// public/storage symlink can't be shipped (Windows blocks symlink copy) and must
+// point at the relocated AppData storage. Recreate as a directory JUNCTION
+// (junctions need no admin rights). Install dir is per-user (NSIS perMachine:false).
+function ensureStorageLink(storagePath) {
+    const linkPath = path.join(projectRoot(), 'public', 'storage');
+    const target   = path.join(storagePath, 'app', 'public');
+    try {
+        if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
+        if (fs.existsSync(linkPath)) return; // already linked
+        fs.symlinkSync(target, linkPath, 'junction');
+        flog('[storage] junction created:', linkPath, '->', target);
+    } catch (e) {
+        flog('[storage] could not create junction:', e.message);
     }
 }
 
-// Laravel's storage:link symlink can't be shipped (Windows blocks symlink copy).
-// Recreate it at startup as a directory JUNCTION — junctions need no admin rights.
-function ensureStorageLink() {
-    const root = projectRoot();
-    const linkPath = path.join(root, 'public', 'storage');
-    const target = path.join(root, 'storage', 'app', 'public');
+// Auto-update — only meaningful in a packaged build that has a publish feed
+// (GitHub releases via electron-builder). Fully non-fatal: a missing/!configured
+// update server must never block app launch.
+function maybeCheckForUpdates() {
+    if (!app.isPackaged) return;
     try {
-        if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
-        if (fs.existsSync(linkPath)) return; // already linked (dev) or present
-        fs.symlinkSync(target, linkPath, 'junction');
-        console.log('[storage] junction created:', linkPath, '->', target);
+        const { autoUpdater } = require('electron-updater');
+        autoUpdater.autoDownload = true;
+        autoUpdater.logger = { info: m => flog('[update]', m), warn: m => flog('[update]', m), error: m => flog('[update-err]', m), debug: () => {} };
+        autoUpdater.on('error', e => flog('[update-err]', e && e.message ? e.message : e));
+        autoUpdater.on('update-downloaded', () => flog('[update] downloaded — will install on quit'));
+        autoUpdater.checkForUpdatesAndNotify().catch(e => flog('[update] check skipped:', e && e.message ? e.message : e));
     } catch (e) {
-        console.error('[storage] could not create junction:', e.message);
+        flog('[update] electron-updater unavailable:', e && e.message ? e.message : e);
     }
 }
 
@@ -125,8 +162,8 @@ async function startPhpServer() {
         return XAMPP_URL;
     }
 
-    ensureWritableDirs();
-    ensureStorageLink();
+    const { dbPath, storagePath } = prepareUserData();
+    ensureStorageLink(storagePath);
 
     const root = projectRoot();
     const serverPhp = path.join(root, 'server.php');
@@ -135,21 +172,21 @@ async function startPhpServer() {
 
     const port = await findFreePort(8123, 8200);
     const url = `http://127.0.0.1:${port}`;
-    // Resolve the SQLite DB relative to the app root so the build is portable
-    // (the shipped .env has a hardcoded dev path). M10 will relocate this to AppData.
-    const dbPath = path.join(root, 'database', 'database.sqlite');
+    const phpEnv = {
+        ...process.env,
+        APP_URL: url,                    // correct asset() URLs
+        APP_DEBUG: 'false',
+        DB_CONNECTION: 'sqlite',
+        DB_DATABASE: dbPath,             // %APPDATA% — survives reinstall/update
+        LARAVEL_STORAGE_PATH: storagePath, // bootstrap/app.php → useStoragePath()
+        QUEUE_CONNECTION: 'database',
+    };
     flog('[PHP] Spawning bundled PHP on', url, 'cwd=' + root, 'db=' + dbPath, 'dbExists=' + fs.existsSync(dbPath));
 
     phpServer = spawn(phpExe, ['-S', `127.0.0.1:${port}`, '-t', 'public', 'server.php'], {
         cwd: root,
         windowsHide: true,
-        env: {
-            ...process.env,
-            APP_URL: url,             // override .env so Laravel asset() URLs are correct
-            APP_DEBUG: 'false',
-            DB_CONNECTION: 'sqlite',
-            DB_DATABASE: dbPath,      // portable: ignore the hardcoded dev path in .env
-        },
+        env: phpEnv,
     });
     phpServer.stdout.on('data', d => flog('[PHP]', d.toString().trimEnd()));
     phpServer.stderr.on('data', d => flog('[PHP-err]', d.toString().trimEnd()));
@@ -159,7 +196,7 @@ async function startPhpServer() {
     try {
         await waitForHttp(url + '/');
         flog('[PHP] server is up at', url);
-        startQueueWorker(phpExe, root, dbPath);
+        startQueueWorker(phpExe, root, phpEnv);
         return url;
     } catch (err) {
         flog('[PHP] ERROR:', err.message);
@@ -170,7 +207,7 @@ async function startPhpServer() {
 
 // Background queue worker: drains the `jobs` table (printing runs here so a
 // slow/offline thermal printer never blocks the cashier's sale request).
-function startQueueWorker(phpExe, root, dbPath) {
+function startQueueWorker(phpExe, root, phpEnv) {
     try {
         queueWorker = spawn(
             phpExe,
@@ -178,13 +215,7 @@ function startQueueWorker(phpExe, root, dbPath) {
             {
                 cwd: root,
                 windowsHide: true,
-                env: {
-                    ...process.env,
-                    APP_DEBUG: 'false',
-                    DB_CONNECTION: 'sqlite',
-                    DB_DATABASE: dbPath,
-                    QUEUE_CONNECTION: 'database',
-                },
+                env: phpEnv, // same DB + storage path as the web process
             }
         );
         queueWorker.stdout.on('data', d => flog('[queue]', d.toString().trimEnd()));
@@ -402,6 +433,7 @@ app.whenReady().then(async () => {
         createWindow(resolvedUrl);
         createTray();
         flog('window + tray created');
+        maybeCheckForUpdates();
     } catch (e) {
         flog('FATAL in whenReady:', e && e.stack ? e.stack : e);
     }

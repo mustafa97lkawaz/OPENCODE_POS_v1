@@ -65,8 +65,21 @@
         "asar": false,
         "win": {
             "target": [
-                "dir"
-            ]
-        }
+                "nsis"
+            ],
+            "icon": "public/favicon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "POS Desktop"
+        },
+        "publish": null
+    },
+    "dependencies": {
+        "electron-updater": "^6.8.3"
     }
 }

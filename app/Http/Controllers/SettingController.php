@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SettingController extends Controller
 {
@@ -31,5 +32,39 @@ class SettingController extends Controller
         $setting->save();
 
         return redirect()->route('settings.index')->with('Edit', 'تم تحديث الاعدادات بنجاح');
+    }
+
+    /**
+     * Copy the live SQLite database to Documents\PosBackups\pos-YYYYMMDD-HHmm.sqlite.
+     * Only meaningful for the SQLite (desktop) connection.
+     */
+    public function backup()
+    {
+        $driver = DB::connection()->getDriverName();
+        if ($driver !== 'sqlite') {
+            return response()->json(['success' => false, 'message' => 'النسخ الاحتياطي متاح لقاعدة SQLite فقط'], 422);
+        }
+
+        $dbFile = DB::connection()->getDatabaseName(); // resolves the live DB_DATABASE
+        if (!$dbFile || !is_file($dbFile)) {
+            return response()->json(['success' => false, 'message' => 'تعذّر تحديد ملف قاعدة البيانات'], 500);
+        }
+
+        $home = getenv('USERPROFILE') ?: getenv('HOME') ?: sys_get_temp_dir();
+        $dir  = rtrim($home, '\\/') . DIRECTORY_SEPARATOR . 'Documents' . DIRECTORY_SEPARATOR . 'PosBackups';
+        if (!is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
+            return response()->json(['success' => false, 'message' => 'تعذّر إنشاء مجلد النسخ الاحتياطي'], 500);
+        }
+
+        $dest = $dir . DIRECTORY_SEPARATOR . 'pos-' . date('Ymd-Hi') . '.sqlite';
+        if (!@copy($dbFile, $dest)) {
+            return response()->json(['success' => false, 'message' => 'فشل نسخ قاعدة البيانات'], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم حفظ النسخة الاحتياطية: ' . $dest,
+            'path'    => $dest,
+        ]);
     }
 }

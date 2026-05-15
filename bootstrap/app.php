@@ -16,6 +16,16 @@ $app = new Illuminate\Foundation\Application(
 );
 
 /*
+| Desktop build: the install dir (Program Files) is read-only, so Electron
+| relocates the writable storage tree to %APPDATA% and passes its path here.
+| No-op for normal web/dev runs (env var unset).
+*/
+$laravelStoragePath = $_SERVER['LARAVEL_STORAGE_PATH'] ?? getenv('LARAVEL_STORAGE_PATH');
+if (!empty($laravelStoragePath)) {
+    $app->useStoragePath($laravelStoragePath);
+}
+
+/*
 |--------------------------------------------------------------------------
 | Bind Important Interfaces
 |--------------------------------------------------------------------------

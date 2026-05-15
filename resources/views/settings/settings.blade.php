@@ -103,8 +103,12 @@
                             <textarea class="form-control" name="receipt_footer" rows="3">{{ $setting->receipt_footer ?? '' }}</textarea>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group d-flex align-items-center">
                             <button type="submit" class="btn btn-primary">حفظ الاعدادات</button>
+                            <button type="button" class="btn btn-outline-success ml-2" id="backupDbBtn">
+                                <i class="fe fe-download"></i> نسخ احتياطي للقاعدة
+                            </button>
+                            <span id="backupResult" class="ml-2"></span>
                         </div>
                     </form>
                 </div>
@@ -138,6 +142,20 @@ $(function () {
             self.prop('disabled', false);
         }).fail(function (xhr) {
             var msg = xhr.responseJSON ? xhr.responseJSON.message : 'تعذّر الاتصال بالطابعة';
+            result.html('<span class="text-danger">' + msg + '</span>');
+            self.prop('disabled', false);
+        });
+    });
+
+    $('#backupDbBtn').on('click', function () {
+        var result = $('#backupResult');
+        var self = $(this).prop('disabled', true);
+        result.html('<span class="text-muted">جاري النسخ...</span>');
+        $.get('{{ route("settings.backup") }}', function (res) {
+            result.html('<span class="text-success">' + res.message + '</span>');
+            self.prop('disabled', false);
+        }).fail(function (xhr) {
+            var msg = xhr.responseJSON ? xhr.responseJSON.message : 'فشل النسخ الاحتياطي';
             result.html('<span class="text-danger">' + msg + '</span>');
             self.prop('disabled', false);
         });
