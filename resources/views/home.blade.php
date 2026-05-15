@@ -14,13 +14,20 @@
         display: flex;
         flex-direction: column;
         width: 100%;
-        height: 100%;
+        /* fixed identical size → every stat card has the same ratio,
+           across both rows, regardless of content */
+        height: 158px;
         margin-bottom: 0;
         border: 0;
         border-radius: 12px;
         background: #fff;
         box-shadow: 0 1px 6px rgba(0, 0, 0, .06);
         transition: transform .15s ease, box-shadow .15s ease;
+    }
+    /* charts are a different kind of card — let them size to their content */
+    .dash-card.dash-chart {
+        height: auto;
+        min-height: 340px;
     }
     .dash-card:hover {
         transform: translateY(-3px);
@@ -240,7 +247,7 @@
 <!-- Charts Row -->
 <div class="row row-sm">
     <div class="col-lg-6 dash-col">
-        <div class="dash-card card h-100">
+        <div class="dash-card dash-chart card">
             <div class="card-header bg-transparent border-0 pb-0">
                 <h5 class="card-title mb-0">المبيعات اليومية</h5>
             </div>
@@ -255,7 +262,7 @@
     </div>
 
     <div class="col-lg-6 dash-col">
-        <div class="dash-card card h-100">
+        <div class="dash-card dash-chart card">
             <div class="card-header bg-transparent border-0 pb-0">
                 <h5 class="card-title mb-0">نظرة عامة</h5>
             </div>
