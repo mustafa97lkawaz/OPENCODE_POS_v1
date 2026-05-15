@@ -11,7 +11,10 @@ class SettingController extends Controller
 {
     public function index()
     {
-        $setting = Setting::first() ?? new Setting();
+        // Persist a row on first visit so the resource-bound update route
+        // (settings/{setting}) resolves — otherwise a fresh install's first
+        // "Save settings" 404s (no Setting #1 exists for route-model binding).
+        $setting = Setting::firstOrCreate([]);
         return view('settings.settings', compact('setting'));
     }
 
