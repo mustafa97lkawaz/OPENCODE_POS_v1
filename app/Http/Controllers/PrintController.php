@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Sale;
 use App\Models\Setting;
 use Mike42\Escpos\Printer;
-use Mike42\Escpos\EscposImage;
+use App\Print\SafeGdEscposImage;
 use Mike42\Escpos\PrintConnectors\FilePrintConnector;
 
 class PrintController extends Controller
@@ -97,7 +97,7 @@ class PrintController extends Controller
         $path = $this->renderTextImage($text, $imgWidth, $align, $fontSize);
         try {
             $printer->setJustification(Printer::JUSTIFY_LEFT);
-            $printer->bitImage(EscposImage::load($path, false));
+            $printer->bitImage(new SafeGdEscposImage($path, false));
         } finally {
             @unlink($path);
         }
@@ -132,7 +132,7 @@ class PrintController extends Controller
         imagedestroy($img);
         try {
             $printer->setJustification(Printer::JUSTIFY_LEFT);
-            $printer->bitImage(EscposImage::load($path, false));
+            $printer->bitImage(new SafeGdEscposImage($path, false));
         } finally {
             @unlink($path);
         }

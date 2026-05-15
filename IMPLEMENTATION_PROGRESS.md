@@ -24,7 +24,7 @@
 | M4 | Move printing to queued job | ✅ | 2026-04-25 | DB queue + `PrintReceiptJob`; Electron runs `queue:work`; retry→failed_jobs verified |
 | M5 | Refactor god view + extract POS JS | ✅ | 2026-04-25 | `pos.blade.php` 1011→322 lines; JS→`public/js/pos.js`; 4 partials; `show()`→Blade |
 | M6 | FormRequests + foreign keys + schema cleanup | ✅ | 2026-04-25 | 6 FormRequests; SuspendedSale model; FKs (set null + restrict) enforced on SQLite |
-| M7 | Convert vendor patch to subclass | ⬜ | — | — |
+| M7 | Convert vendor patch to subclass | ✅ | 2026-04-25 | `App\Print\SafeGdEscposImage`; `composer install` clean; print logic verified |
 | M8 | Delete dead theme views | ⬜ | — | — |
 | M9 | Tests | ⬜ | — | — |
 | M10 | Real installer + auto-update + backup | ⬜ | — | — |
@@ -88,10 +88,12 @@
 - [x] 6.4 Fixed bare `is_variant`/`is_featured` checkboxes in `products/create`+`edit` (hidden `value="0"` + checkbox `value="1"`) so the new `boolean` rule accepts them. `recurring` already had `value="1"` (safe).
 - [x] 6.5 Verified: `route:list` unchanged (267); all controllers lint clean; invalid customer→redirect-with-errors, valid→created; `PRAGMA foreign_keys=1`; bad `category_id` rejected; **sold product delete blocked gracefully (302, not 500), product preserved**; test data rolled back.
 
-### M7 — Convert vendor patch to subclass ⬜
-- [ ] 7.1 Create `App\Print\SafeGdEscposImage` subclass
-- [ ] 7.2 Use it in `PrintController`
-- [ ] 7.3 Revert vendor file (composer install)
+### M7 — Convert vendor patch to subclass ✅
+- [x] 7.1 Created `app/Print/SafeGdEscposImage.php` — **fully reimplements** `readImageFromGdResource()` (PHP-8 `\GdImage` safe). Deliberately does NOT delegate the type-check to `parent::` (the plan's snippet was flawed — `parent::` after revert would re-introduce the bug on older vendor versions).
+- [x] 7.2 `PrintController` — both `EscposImage::load($path,false)` → `new SafeGdEscposImage($path,false)`. (Note: `EscposImage::load()` hardcodes `new GdEscposImage` with no late-static-binding, so `SafeGdEscposImage::load()` would NOT return the subclass — must construct directly. Lazy `loadImageData()` via `$this->` still routes to our override.)
+- [x] 7.3 `composer install` ran clean (vendor patch reverted). Functional test: built PNG → `new SafeGdEscposImage` → `toRasterFormat()` OK (20×10, 30 raster bytes).
+
+> **Finding:** upstream mike42/escpos-php **v2.2 already contains** the `\GdImage` check, so there was no longer an *active* break — but the subclass now **guarantees** correctness independent of vendor version/state and removes the fragile hand-edit. Goal met.
 
 ### M8 — Theme cleanup ⬜
 - [ ] 8.1 List unused views
@@ -165,3 +167,4 @@
 | 2026-04-25 | M6        | SaleController 4 raw suspended_sales queries → SuspendedSale Eloquent. |
 | 2026-04-25 | M6        | Fixed is_variant/is_featured checkboxes (products create/edit). |
 | 2026-04-25 | M6        | Verified: routes 267 unchanged, FormRequest validation works, FK restrict blocks sold-product delete (302 not 500). **M6 complete.** |
+| 2026-04-25 | M7        | Created App\Print\SafeGdEscposImage (full reimpl, PHP8 GdImage-safe); PrintController uses `new SafeGdEscposImage()`; composer install clean; raster test OK. **M7 complete.** |
