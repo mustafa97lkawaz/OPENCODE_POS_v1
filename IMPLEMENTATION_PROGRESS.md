@@ -22,7 +22,7 @@
 | M2 | Drop XAMPP, switch to SQLite | ✅ | 2026-04-25 | MySQL no longer needed; Apache still required until M3 |
 | M3 | Bundle PHP into Electron | ✅ | 2026-04-25 | PHP 8.2.30 bundled; **packaged .exe verified end-to-end** (HTTP 200, full UI, no XAMPP/MySQL) |
 | M4 | Move printing to queued job | ✅ | 2026-04-25 | DB queue + `PrintReceiptJob`; Electron runs `queue:work`; retry→failed_jobs verified |
-| M5 | Refactor god view + extract POS JS | ⬜ | — | — |
+| M5 | Refactor god view + extract POS JS | ✅ | 2026-04-25 | `pos.blade.php` 1011→322 lines; JS→`public/js/pos.js`; 4 partials; `show()`→Blade |
 | M6 | FormRequests + foreign keys + schema cleanup | ⬜ | — | — |
 | M7 | Convert vendor patch to subclass | ⬜ | — | — |
 | M8 | Delete dead theme views | ⬜ | — | — |
@@ -73,10 +73,13 @@
 
 **Why this matters most after M3:** the bundled PHP built-in server (M3) is **single-threaded** — a synchronous multi-second print would freeze the *entire* POS for all requests. Queuing makes the sale request return in ms.
 
-### M5 — Refactor god view + extract POS JS ⬜
-- [ ] 5.1 Extract JS to `public/js/pos.js`
-- [ ] 5.2 Split blade into partials
-- [ ] 5.3 Replace `SaleController::show()` HTML string with Blade partial
+### M5 — Refactor god view + extract POS JS ✅
+- [x] 5.1 ~570-line inline `<script>` → `public/js/pos.js`; server values passed via `window.POS_ROUTES` + `window.POS_BOOT` (handles `resume_sale`); cache-busted with `filemtime`
+- [x] 5.2 Split into 4 partials: `partials/products-grid`, `partials/cart`, `partials/payment-modal`, `partials/sale-forms` (included from `pos.blade.php`)
+- [x] 5.3 `SaleController::show()` raw HTML-string builder → `view('sales.partials.invoice-details')`
+- [x] 5.4 Verified end-to-end: login → POS HTTP 200, all partials render, Arabic intact, `pos.js` served; created a real sale (store `{success:true}`), `/sales/{id}` returns invoice partial with **unescaped Arabic**
+
+> **Note:** `pos.blade.php` is 322 lines (plan target was <250). The remaining bulk is the ~240-line inline `<style>` block — out of scope for M5 (5.1–5.3 only covered JS/HTML). Actual HTML+JS structure is now ~80 lines. CSS extraction could be a future cleanup if desired.
 
 ### M6 — Validation & schema cleanup ⬜
 - [ ] 6.1 Generate FormRequest classes
@@ -152,3 +155,7 @@
 | 2026-04-25 | M4        | Refactored `PrintController`: `renderSaleReceipt()` throws on failure; `printReceipt()` HTTP action dispatches the job & returns instantly. |
 | 2026-04-25 | M4        | `electron/main.js`: `startQueueWorker()` spawns bundled-PHP `queue:work`; killed on quit. |
 | 2026-04-25 | M4        | Verified: instant dispatch (row in `jobs`); worker drains; bad sale → 3 retries → `failed_jobs` w/ real exception. **M4 complete.** |
+| 2026-04-25 | M5        | Extracted ~570-line inline script → `public/js/pos.js`; blade injects `POS_ROUTES`/`POS_BOOT`. (First attempt via PowerShell corrupted Arabic encoding → restored from git, redone byte-safe via Bash.) |
+| 2026-04-25 | M5        | Created partials: `products-grid`, `cart`, `payment-modal`, `sale-forms`; `pos.blade.php` 1011→322 lines. |
+| 2026-04-25 | M5        | `SaleController::show()` HTML-string → `sales.partials.invoice-details` Blade view. |
+| 2026-04-25 | M5        | Verified: login + POS HTTP 200, all partials render w/ correct Arabic, `pos.js` served; real sale created + `/sales/{id}` invoice partial renders unescaped Arabic. Test sale rolled back. **M5 complete.** |

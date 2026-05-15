@@ -1,0 +1,2 @@
+ 'email' => 'samir.gamal77@yahoo.com',
+            'password' => bcrypt('123456'),

@@ -26,62 +26,8 @@ class SaleController extends Controller
         if (!$sale) {
             return '<div class="alert alert-danger">الفاتورة غير موجودة</div>';
         }
-        
-        $html = '
-        <div class="invoice-details">
-            <h5>رقم الفاتورة: ' . $sale->invoice_number . '</h5>
-            <p>العميل: ' . ($sale->customer->Customer_name ?? 'زائر') . '</p>
-            <p>التاريخ: ' . $sale->created_at . '</p>
-            <p>طريقة الدفع: ';
-            
-        if($sale->payment_method == 'cash') $html .= 'نقدي';
-        elseif($sale->payment_method == 'card') $html .= 'بطاقة';
-        else $html .= 'Split';
-        
-        $html .= '</p>
-        </div>
-        <table class="table table-bordered mt-3">
-            <thead>
-                <tr>
-                    <th>المنتج</th>
-                    <th>الكمية</th>
-                    <th>السعر</th>
-                    <th>الاجمالي</th>
-                </tr>
-            </thead>
-            <tbody>';
-        
-        foreach ($sale->saleItems as $item) {
-            $html .= '<tr>
-                <td>' . ($item->product->Product_name ?? 'منتج محذوف') . '</td>
-                <td>' . $item->qty . '</td>
-                <td>' . number_format($item->unit_price, 2) . '</td>
-                <td>' . number_format($item->total, 2) . '</td>
-            </tr>';
-        }
-        
-        $html .= '</tbody>
-            <tfoot>
-                <tr>
-                    <th colspan="3">المجموع</th>
-                    <th>' . number_format($sale->subtotal, 2) . '</th>
-                </tr>
-                <tr>
-                    <th colspan="3">الضريبة</th>
-                    <th>' . number_format($sale->tax_amount, 2) . '</th>
-                </tr>
-                <tr>
-                    <th colspan="3">الخصم</th>
-                    <th>' . number_format($sale->discount, 2) . '</th>
-                </tr>
-                <tr>
-                    <th colspan="3">الاجمالي</th>
-                    <th>' . number_format($sale->total, 2) . '</th>
-                </tr>
-            </tfoot>
-        </table>';
-        
-        return $html;
+
+        return view('sales.partials.invoice-details', compact('sale'))->render();
     }
 
     public function pos()
