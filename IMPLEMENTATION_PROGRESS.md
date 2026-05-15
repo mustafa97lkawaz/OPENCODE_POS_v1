@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | M1 | Lock down data integrity | ✅ | 2026-04-25 | Password sanitized in `.env` + docs; user must replace with new App Password |
 | M2 | Drop XAMPP, switch to SQLite | ✅ | 2026-04-25 | MySQL no longer needed; Apache still required until M3 |
-| M3 | Bundle PHP into Electron | ✅ | 2026-04-25 | PHP 8.2.30 NTS x64 bundled; Laravel served end-to-end at 127.0.0.1:8123 |
+| M3 | Bundle PHP into Electron | ✅ | 2026-04-25 | PHP 8.2.30 bundled; **packaged .exe verified end-to-end** (HTTP 200, full UI, no XAMPP/MySQL) |
 | M4 | Move printing to queued job | ⬜ | — | — |
 | M5 | Refactor god view + extract POS JS | ⬜ | — | — |
 | M6 | FormRequests + foreign keys + schema cleanup | ⬜ | — | — |
@@ -51,8 +51,18 @@
 - [x] 3.2 `electron/main.js` — `startPhpServer()` auto-detects bundled PHP, spawns it on free port 8123-8200, polls until ready, gracefully falls back to XAMPP URL if missing
 - [x] 3.3 `createWindow(loadUrl)` now takes URL parameter
 - [x] 3.4 `APP_URL` injected via spawn env (cleaner than editing `.env` — Laravel `env()` reads it dynamically)
-- [x] 3.5 `package.json` `build` block extended: bundles `app/`, `bootstrap/`, `config/`, `database/`, `public/`, `resources/`, `routes/`, `storage/`, `vendor/`, `artisan`, `server.php`, `.env`. `electron/php/**` and `database/database.sqlite` added to `asarUnpack` so PHP and DB live as real files on disk
-- [x] 3.6 End-to-end smoke test: spawned bundled PHP via `php.exe -S 127.0.0.1:8123 -t public server.php` → `GET /` returned HTTP 200 with Laravel login HTML, `GET /home` returned HTTP 302 (auth redirect). **Clean-VM install test deferred until first packaged build.**
+- [x] 3.5 `package.json` `build`: `"asar": false` (all files real on disk so PHP can read them), bundles full Laravel app + vendor + bundled PHP; excludes the un-shippable `public/storage` symlink + stale cache dirs
+- [x] 3.6 **Packaged `.exe` verified end-to-end:** built `dist/win-unpacked/POS Desktop.exe` (~640 MB), launched it, bundled PHP spawned on 127.0.0.1:8123, `GET /` → **HTTP 200 full login UI + assets**, no XAMPP/MySQL running. Clean-VM test still recommended before shipping.
+
+**M3 issues found & fixed during verification:**
+- `winCodeSign` 7z extraction logs 2 macOS-symlink errors on Windows — **non-fatal noise**, build completes fine.
+- Packaged PHP couldn't read files inside `app.asar` → set `"asar": false`.
+- `public/storage` is a symlink electron-builder can't recreate on Windows (EPERM) → excluded from build; `ensureStorageLink()` recreates it at launch as a **directory junction** (no admin needed).
+- Laravel `View\Compiler` FatalError: writable dirs (`storage/framework/{views,cache,sessions}`, `storage/logs`, `bootstrap/cache`) didn't exist → `ensureWritableDirs()` mkdir's them at launch.
+- Packaged `.env` has a hardcoded dev SQLite path → main.js now injects portable `DB_DATABASE` via spawn env. ⚠️ **Known follow-up for M10:** bundled DB lives under Program Files (read-only in real installs) — must relocate to `%APPDATA%` on first launch.
+- File logger added (`%TEMP%\pos-desktop.log`) + `uncaughtException`/`unhandledRejection` handlers for production diagnostics.
+
+> ⚠️ **Test-harness note:** `ELECTRON_RUN_AS_NODE=1` is set in this machine's shell env. Launching the `.exe` from a shell that inherits it makes Electron run as bare Node and exit instantly. Normal double-click / the `electron:start` npm script (which clears the var) are unaffected.
 
 ### M4 — Move printing to queued job ⬜
 - [ ] 4.1 Set up database queue
@@ -88,7 +98,7 @@
 
 ### M10 — Distribution polish ⬜
 - [ ] 10.1 Switch electron-builder target to NSIS installer
-- [ ] 10.2 Move SQLite DB to user's AppData on first launch
+- [ ] 10.2 Move SQLite DB to user's AppData on first launch ⚠️ **REQUIRED** — M3 build currently points `DB_DATABASE` at the install dir which is read-only under Program Files; copy seed DB to `%APPDATA%\POS Desktop\database.sqlite` on first run and point `DB_DATABASE` there. Same applies to `storage/` writable dirs.
 - [ ] 10.3 Auto-update with `electron-updater`
 - [ ] 10.4 Backup button
 
@@ -129,4 +139,8 @@
 | 2026-04-25 | M3        | `launcher.js` updated: skip XAMPP entirely when bundled PHP exists; skip MySQL always (we're on SQLite). |
 | 2026-04-25 | M3        | `node --check electron/main.js` passes; `package.json` JSON valid. |
 | 2026-04-25 | M3        | Downloaded PHP 8.2.30 NTS Win64 from windows.php.net (31.8 MB), extracted into `electron/php/` (82 MB), copied `php.ini-development` → `php.ini`, enabled gd/mbstring/pdo_sqlite/sqlite3/openssl/fileinfo/curl/intl. |
-| 2026-04-25 | M3        | Smoke test: bundled `php.exe -S 127.0.0.1:8123 -t public server.php` served Laravel login (HTTP 200) and `/home` redirect (HTTP 302). End-to-end SQLite+bundled-PHP+Laravel chain validated. **M3 complete.** |
+| 2026-04-25 | M3        | Smoke test: bundled `php.exe -S 127.0.0.1:8123 -t public server.php` served Laravel login (HTTP 200) and `/home` redirect (HTTP 302). |
+| 2026-04-25 | M3        | `npm run electron:build` packaged `dist/win-unpacked/POS Desktop.exe` (~677 MB). winCodeSign macOS-symlink errors confirmed non-fatal. |
+| 2026-04-25 | M3        | Fixed packaging: `"asar": false` (PHP can't read inside asar); excluded `public/storage` symlink; added `ensureWritableDirs()` + `ensureStorageLink()` (junction) at launch; portable `DB_DATABASE` via spawn env; file logger + crash handlers. |
+| 2026-04-25 | M3        | **Packaged `.exe` verified end-to-end:** clean rebuild, launched, `[dirs] created`, bundled PHP up, `resolvedUrl=http://127.0.0.1:8123`, window created, `GET /` → HTTP 200 full UI. No XAMPP/MySQL. **M3 complete.** |
+| 2026-04-25 | M10 (note)| Bundled SQLite DB resolves under install dir (read-only in real installs). Must relocate to `%APPDATA%` on first launch — flagged in M10.2. |

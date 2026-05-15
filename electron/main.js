@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const net = require('net');
 const http = require('http');
 const { spawn } = require('child_process');
@@ -13,14 +14,75 @@ let resolvedUrl = null;
 
 const XAMPP_URL = 'http://localhost/pos_opencodee/public';
 
-// app.getAppPath() works both in dev (project root) and packaged (asar root).
-// In packaged builds, electron/php/** must be in asarUnpack so php.exe is on disk.
+// ---- File logging (GUI Electron has no console) ----
+// os.tmpdir() needs no app readiness and always exists — safe at module load.
+const LOG_FILE = path.join(os.tmpdir(), 'pos-desktop.log');
+function flog(...args) {
+    const line = `[${new Date().toISOString()}] ` + args.map(a =>
+        typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    try { fs.appendFileSync(LOG_FILE, line + '\n'); } catch (e) { /* ignore */ }
+    console.log(line);
+}
+process.on('uncaughtException', err => {
+    flog('UNCAUGHT EXCEPTION:', err && err.stack ? err.stack : err);
+});
+process.on('unhandledRejection', reason => {
+    flog('UNHANDLED REJECTION:', reason && reason.stack ? reason.stack : reason);
+});
+try {
+    fs.writeFileSync(LOG_FILE, ''); // truncate per launch
+    flog('=== POS Desktop starting ===', 'isPackaged=' + app.isPackaged, 'appPath=' + app.getAppPath(), 'argv=' + JSON.stringify(process.argv));
+} catch (e) { /* ignore */ }
+
+// Build uses "asar": false, so app.getAppPath() returns the real Laravel root
+// (resources/app in packaged builds, project dir in dev) — PHP can read every file.
 function projectRoot() {
-    return app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked') : app.getAppPath();
+    return app.getAppPath();
 }
 
 function bundledPhpPath() {
     return path.join(projectRoot(), 'electron', 'php', 'php.exe');
+}
+
+// Laravel needs these writable dirs to exist; their contents are excluded from
+// the build (don't ship stale cache), so the empty dirs must be recreated at launch.
+function ensureWritableDirs() {
+    const root = projectRoot();
+    const dirs = [
+        'storage/framework/views',
+        'storage/framework/cache/data',
+        'storage/framework/sessions',
+        'storage/logs',
+        'storage/app/public',
+        'bootstrap/cache',
+    ];
+    for (const d of dirs) {
+        const full = path.join(root, ...d.split('/'));
+        try {
+            if (!fs.existsSync(full)) {
+                fs.mkdirSync(full, { recursive: true });
+                flog('[dirs] created', full);
+            }
+        } catch (e) {
+            flog('[dirs] FAILED to create', full, '-', e.message);
+        }
+    }
+}
+
+// Laravel's storage:link symlink can't be shipped (Windows blocks symlink copy).
+// Recreate it at startup as a directory JUNCTION — junctions need no admin rights.
+function ensureStorageLink() {
+    const root = projectRoot();
+    const linkPath = path.join(root, 'public', 'storage');
+    const target = path.join(root, 'storage', 'app', 'public');
+    try {
+        if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
+        if (fs.existsSync(linkPath)) return; // already linked (dev) or present
+        fs.symlinkSync(target, linkPath, 'junction');
+        console.log('[storage] junction created:', linkPath, '->', target);
+    } catch (e) {
+        console.error('[storage] could not create junction:', e.message);
+    }
 }
 
 function findFreePort(start = 8123, end = 8200) {
@@ -56,15 +118,26 @@ function waitForHttp(url, timeoutMs = 15000) {
 
 async function startPhpServer() {
     const phpExe = bundledPhpPath();
+    flog('[PHP] looking for bundled PHP at', phpExe, 'exists=' + fs.existsSync(phpExe));
     if (!fs.existsSync(phpExe)) {
-        console.log('[PHP] No bundled PHP at', phpExe, '— falling back to XAMPP URL');
+        flog('[PHP] No bundled PHP — falling back to XAMPP URL');
         return XAMPP_URL;
     }
 
-    const port = await findFreePort(8123, 8200);
+    ensureWritableDirs();
+    ensureStorageLink();
+
     const root = projectRoot();
+    const serverPhp = path.join(root, 'server.php');
+    const publicDir = path.join(root, 'public');
+    flog('[PHP] root=' + root, 'server.php exists=' + fs.existsSync(serverPhp), 'public exists=' + fs.existsSync(publicDir));
+
+    const port = await findFreePort(8123, 8200);
     const url = `http://127.0.0.1:${port}`;
-    console.log('[PHP] Spawning bundled PHP on', url);
+    // Resolve the SQLite DB relative to the app root so the build is portable
+    // (the shipped .env has a hardcoded dev path). M10 will relocate this to AppData.
+    const dbPath = path.join(root, 'database', 'database.sqlite');
+    flog('[PHP] Spawning bundled PHP on', url, 'cwd=' + root, 'db=' + dbPath, 'dbExists=' + fs.existsSync(dbPath));
 
     phpServer = spawn(phpExe, ['-S', `127.0.0.1:${port}`, '-t', 'public', 'server.php'], {
         cwd: root,
@@ -73,17 +146,21 @@ async function startPhpServer() {
             ...process.env,
             APP_URL: url,             // override .env so Laravel asset() URLs are correct
             APP_DEBUG: 'false',
+            DB_CONNECTION: 'sqlite',
+            DB_DATABASE: dbPath,      // portable: ignore the hardcoded dev path in .env
         },
     });
-    phpServer.stdout.on('data', d => console.log('[PHP]', d.toString().trimEnd()));
-    phpServer.stderr.on('data', d => console.error('[PHP-err]', d.toString().trimEnd()));
-    phpServer.on('exit', code => console.log('[PHP] exited with code', code));
+    phpServer.stdout.on('data', d => flog('[PHP]', d.toString().trimEnd()));
+    phpServer.stderr.on('data', d => flog('[PHP-err]', d.toString().trimEnd()));
+    phpServer.on('error', e => flog('[PHP] spawn error:', e.message));
+    phpServer.on('exit', code => flog('[PHP] exited with code', code));
 
     try {
         await waitForHttp(url + '/');
+        flog('[PHP] server is up at', url);
         return url;
     } catch (err) {
-        console.error('[PHP]', err.message);
+        flog('[PHP] ERROR:', err.message);
         if (phpServer) { phpServer.kill(); phpServer = null; }
         return XAMPP_URL; // graceful fallback
     }
@@ -284,9 +361,16 @@ function createTray() {
 }
 
 app.whenReady().then(async () => {
-    resolvedUrl = await startPhpServer();
-    createWindow(resolvedUrl);
-    createTray();
+    flog('app ready, log file at', LOG_FILE);
+    try {
+        resolvedUrl = await startPhpServer();
+        flog('resolvedUrl =', resolvedUrl);
+        createWindow(resolvedUrl);
+        createTray();
+        flog('window + tray created');
+    } catch (e) {
+        flog('FATAL in whenReady:', e && e.stack ? e.stack : e);
+    }
 
     ipcMain.on('window-minimize', () => {
         if (mainWindow) mainWindow.minimize();

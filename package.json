@@ -53,6 +53,8 @@
             "artisan",
             "server.php",
             ".env",
+            "!public/storage",
+            "!public/storage/**/*",
             "!storage/logs/*",
             "!storage/framework/cache/data/*",
             "!storage/framework/sessions/*",
@@ -60,21 +62,7 @@
             "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
             "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
         ],
-        "asarUnpack": [
-            "electron/php/**/*",
-            "app/**/*",
-            "bootstrap/**/*",
-            "config/**/*",
-            "database/**/*",
-            "public/**/*",
-            "resources/**/*",
-            "routes/**/*",
-            "storage/**/*",
-            "vendor/**/*",
-            "artisan",
-            "server.php",
-            ".env"
-        ],
+        "asar": false,
         "win": {
             "target": [
                 "dir"

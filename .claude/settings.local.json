@@ -3,7 +3,8 @@
     "allow": [
       "Bash(xargs grep *)",
       "Bash(curl -s -c /tmp/pos_cookies.txt -b /tmp/pos_cookies.txt -X POST http://localhost/pos_opencodee/public/login -d '_token=BJIaGsf23ayuh2xBqgm32Wp4TeKaERqzJfaLzsxZ&email=samir.gamal77%40yahoo.com&password=password' -L -o /dev/null -w '%{http_code}')",
-      "Bash(php -r ' *)"
+      "Bash(php -r ' *)",
+      "PowerShell(Get-Process | Where-Object { $_.Name -match 'POS Desktop|electron|php' } | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep 1; $exe = 'C:\\\\xampp\\\\htdocs\\\\pos_opencodee\\\\dist\\\\win-unpacked\\\\POS Desktop.exe'; $p = Start-Process -FilePath $exe -PassThru; \"Launched PID=$\\($p.Id\\)\"; Start-Sleep -Seconds 12; \"alive after 12s: \" + \\(-not $p.HasExited\\); \"running procs: \" + \\(\\(Get-Process | Where-Object { $_.Name -match 'POS Desktop|php' }\\).Count\\); \"--- probe ports 8123-8140 ---\"; 8123..8140 | ForEach-Object { try { $r = Invoke-WebRequest -UseBasicParsing \"http://127.0.0.1:$_/\" -TimeoutSec 1 -ErrorAction Stop; \"PORT $_ -> HTTP $\\($r.StatusCode\\), $\\($r.RawContentLength\\) bytes\" } catch {} })"
     ]
   }
 }
