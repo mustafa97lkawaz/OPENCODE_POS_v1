@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Requests\Sales\StoreSaleRequest;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Sale;
 use App\Models\Customer;
 use App\Models\SaleItem;
 use App\Models\Products;
+use App\Models\SuspendedSale;
 use Illuminate\Support\Facades\DB;
 
 class SaleController extends Controller
@@ -46,16 +48,8 @@ class SaleController extends Controller
         return view('sales.pos-fullscreen', compact('products', 'categories', 'customers'));
     }
 
-    public function store(Request $request)
+    public function store(StoreSaleRequest $request)
     {
-        $request->validate([
-            'payment_method' => 'required|in:cash,card,split',
-            'items_json'     => 'required|json',
-        ], [
-            'payment_method.required' => 'يرجي اختيار طريقة الدفع',
-            'items_json.required'     => 'السلة فارغة',
-        ]);
-
         $items = json_decode($request->items_json, true) ?: [];
         if (empty($items)) {
             return $request->ajax()
@@ -171,14 +165,12 @@ class SaleController extends Controller
             }
         }
 
-        DB::table('suspended_sales')->insert([
+        SuspendedSale::create([
             'invoice_number' => $invoice_number,
             'customer_id'    => $request->customer_id,
-            'items_json'     => $request->items_json,
-            'total'         => $total,
-            'Created_by'    => Auth::user()->name,
-            'created_at'    => now(),
-            'updated_at'    => now(),
+            'items_json'     => $items,                 // model casts array → JSON
+            'total'          => $total,
+            'Created_by'     => Auth::user()->name,
         ]);
 
         session()->flash('Add', 'تم تعليق البيع بنجاح');
@@ -187,19 +179,17 @@ class SaleController extends Controller
 
     public function getSuspended()
     {
-        $suspended = DB::table('suspended_sales')->get();
-        return response()->json($suspended);
+        return response()->json(SuspendedSale::all());
     }
 
     public function resumeSuspended($id)
     {
-        $suspended = DB::table('suspended_sales')->where('id', $id)->first();
-        return response()->json($suspended);
+        return response()->json(SuspendedSale::find($id));
     }
 
     public function deleteSuspended($id)
     {
-        DB::table('suspended_sales')->where('id', $id)->delete();
+        SuspendedSale::where('id', $id)->delete();
         session()->flash('delete', 'تم حذف البيع المعلق بنجاح');
         return redirect()->back();
     }

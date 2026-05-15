@@ -23,7 +23,7 @@
 | M3 | Bundle PHP into Electron | ✅ | 2026-04-25 | PHP 8.2.30 bundled; **packaged .exe verified end-to-end** (HTTP 200, full UI, no XAMPP/MySQL) |
 | M4 | Move printing to queued job | ✅ | 2026-04-25 | DB queue + `PrintReceiptJob`; Electron runs `queue:work`; retry→failed_jobs verified |
 | M5 | Refactor god view + extract POS JS | ✅ | 2026-04-25 | `pos.blade.php` 1011→322 lines; JS→`public/js/pos.js`; 4 partials; `show()`→Blade |
-| M6 | FormRequests + foreign keys + schema cleanup | ⬜ | — | — |
+| M6 | FormRequests + foreign keys + schema cleanup | ✅ | 2026-04-25 | 6 FormRequests; SuspendedSale model; FKs (set null + restrict) enforced on SQLite |
 | M7 | Convert vendor patch to subclass | ⬜ | — | — |
 | M8 | Delete dead theme views | ⬜ | — | — |
 | M9 | Tests | ⬜ | — | — |
@@ -81,11 +81,12 @@
 
 > **Note:** `pos.blade.php` is 322 lines (plan target was <250). The remaining bulk is the ~240-line inline `<style>` block — out of scope for M5 (5.1–5.3 only covered JS/HTML). Actual HTML+JS structure is now ~80 lines. CSS extraction could be a future cleanup if desired.
 
-### M6 — Validation & schema cleanup ⬜
-- [ ] 6.1 Generate FormRequest classes
-- [ ] 6.2 Migration: shrink string lengths + add foreign keys
-- [ ] 6.3 Create `SuspendedSale` Eloquent model
-- [ ] 6.4 Audit boolean checkbox forms
+### M6 — Validation & schema cleanup ✅
+- [x] 6.1 Created 6 FormRequests (`Sales/StoreSaleRequest`, `Products/Store+UpdateProductRequest`, `Customers/StoreCustomerRequest`, `Expenses/StoreExpenseRequest`, `StockAdjustments/StoreStockAdjustmentRequest`); wired into Sale/Products/Customer/Expense/StockAdjustment controllers (store **and** update where applicable). `authorize()=true` (routes already auth-gated). Arabic messages/attributes preserved. `max:999`→`max:191` for names.
+- [x] 6.2 SQLite-safe FKs added in **create** migrations (SQLite can't ALTER-ADD FK): `products.category_id`→categories `SET NULL` (+ index); `sale_items.product_id`→products changed `cascade`→**`restrict`** (preserve sales history). `ProductsController::destroy()` catches the `QueryException` → friendly Arabic message. Length-shrink skipped (SQLite `->change()` unsupported; FormRequest `max:191` enforces at runtime, per plan note).
+- [x] 6.3 `SuspendedSale` model already existed + used by `SuspendedSaleController`; replaced the 4 remaining raw `DB::table('suspended_sales')` calls in `SaleController` with Eloquent (passes decoded array so the `items_json` array-cast round-trips correctly).
+- [x] 6.4 Fixed bare `is_variant`/`is_featured` checkboxes in `products/create`+`edit` (hidden `value="0"` + checkbox `value="1"`) so the new `boolean` rule accepts them. `recurring` already had `value="1"` (safe).
+- [x] 6.5 Verified: `route:list` unchanged (267); all controllers lint clean; invalid customer→redirect-with-errors, valid→created; `PRAGMA foreign_keys=1`; bad `category_id` rejected; **sold product delete blocked gracefully (302, not 500), product preserved**; test data rolled back.
 
 ### M7 — Convert vendor patch to subclass ⬜
 - [ ] 7.1 Create `App\Print\SafeGdEscposImage` subclass
@@ -159,3 +160,8 @@
 | 2026-04-25 | M5        | Created partials: `products-grid`, `cart`, `payment-modal`, `sale-forms`; `pos.blade.php` 1011→322 lines. |
 | 2026-04-25 | M5        | `SaleController::show()` HTML-string → `sales.partials.invoice-details` Blade view. |
 | 2026-04-25 | M5        | Verified: login + POS HTTP 200, all partials render w/ correct Arabic, `pos.js` served; real sale created + `/sales/{id}` invoice partial renders unescaped Arabic. Test sale rolled back. **M5 complete.** |
+| 2026-04-25 | M6        | Created 6 FormRequests + wired into 5 controllers; Arabic messages preserved; names max:191. |
+| 2026-04-25 | M6        | SQLite-safe FKs in create migrations: products.category_id SET NULL, sale_items.product_id RESTRICT; destroy() catches QueryException. migrate:fresh --seed OK. |
+| 2026-04-25 | M6        | SaleController 4 raw suspended_sales queries → SuspendedSale Eloquent. |
+| 2026-04-25 | M6        | Fixed is_variant/is_featured checkboxes (products create/edit). |
+| 2026-04-25 | M6        | Verified: routes 267 unchanged, FormRequest validation works, FK restrict blocks sold-product delete (302 not 500). **M6 complete.** |

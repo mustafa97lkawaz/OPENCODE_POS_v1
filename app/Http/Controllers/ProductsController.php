@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Products;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use App\Http\Requests\Products\StoreProductRequest;
+use App\Http\Requests\Products\UpdateProductRequest;
 use Illuminate\Support\Facades\File;
 
 class ProductsController extends Controller
@@ -29,53 +31,9 @@ class ProductsController extends Controller
         return view('products.edit', compact('product', 'categories'));
     }
 
-    public function store(Request $request)
+    public function store(StoreProductRequest $request)
     {
-        $validated = $request->validate([
-            'Product_name' => 'required|string|max:999',
-            'category_id' => 'required|exists:categories,id',
-            'sku' => 'nullable|string|unique:products,sku|max:50',
-            'barcode' => 'nullable|string|unique:products,barcode|max:50',
-            'description' => 'nullable|string',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'cost_price' => 'nullable|numeric|min:0',
-            'sell_price' => 'required|numeric|min:0',
-            'tax_rate' => 'nullable|numeric|min:0|max:100',
-            'reorder_point' => 'nullable|integer|min:0',
-            'wac' => 'nullable|numeric|min:0',
-            'stock_qty' => 'nullable|integer|min:0',
-            'expire_date' => 'nullable|date',
-            'alert_qty' => 'nullable|integer|min:0',
-            'is_variant' => 'nullable|boolean',
-            'variant_name' => 'nullable|string|max:100',
-            'unit' => 'nullable|string|max:50',
-            'variations' => 'nullable|json',
-            'max_stock' => 'nullable|integer|min:0',
-            'is_featured' => 'nullable|boolean',
-            'is_active' => 'nullable|boolean',
-        ], [], [
-            'Product_name' => 'اسم المنتج',
-            'category_id' => 'القسم',
-            'sku' => 'رمز المنتج',
-            'barcode' => 'الباركود',
-            'description' => 'الملاحظات',
-            'photo' => 'صورة المنتج',
-            'cost_price' => 'سعر التكلفة',
-            'sell_price' => 'سعر البيع',
-            'tax_rate' => 'نسبة الضريبة',
-            'reorder_point' => 'نقطة اعادة الطلب',
-            'wac' => 'متوسط السعر المرجح',
-            'stock_qty' => 'الكمية',
-            'expire_date' => 'تاريخ الانتهاء',
-            'alert_qty' => 'كمية التنبيه',
-            'is_variant' => 'له متغيرات',
-            'variant_name' => 'اسم المتغير',
-            'unit' => 'الوحدة',
-            'variations' => 'المتغيرات',
-            'max_stock' => 'الكمية القصوى',
-            'is_featured' => 'منتج مميز',
-            'is_active' => 'الحالة',
-        ]);
+        $validated = $request->validated();
 
         $validated['Created_by'] = auth()->user()->name ?? 'System';
         $validated['Status'] = $request->is_active == false ? 'غير مفعل' : 'مفعل';
@@ -110,57 +68,13 @@ class ProductsController extends Controller
         return redirect('/products');
     }
 
-    public function update(Request $request, $id = null)
+    public function update(UpdateProductRequest $request, $id = null)
     {
         // Handle both resource route ($id) and modal form (pro_id)
         $productId = $id ?? $request->pro_id;
         $product = Products::findOrFail($productId);
 
-        $validated = $request->validate([
-            'Product_name' => 'required|string|max:999',
-            'category_id' => 'required|exists:categories,id',
-            'sku' => 'nullable|string|max:50|unique:products,sku,' . $productId,
-            'barcode' => 'nullable|string|max:50|unique:products,barcode,' . $productId,
-            'description' => 'nullable|string',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'cost_price' => 'nullable|numeric|min:0',
-            'sell_price' => 'required|numeric|min:0',
-            'tax_rate' => 'nullable|numeric|min:0|max:100',
-            'reorder_point' => 'nullable|integer|min:0',
-            'wac' => 'nullable|numeric|min:0',
-            'stock_qty' => 'nullable|integer|min:0',
-            'expire_date' => 'nullable|date',
-            'alert_qty' => 'nullable|integer|min:0',
-            'is_variant' => 'nullable|boolean',
-            'variant_name' => 'nullable|string|max:100',
-            'unit' => 'nullable|string|max:50',
-            'variations' => 'nullable|json',
-            'max_stock' => 'nullable|integer|min:0',
-            'is_featured' => 'nullable|boolean',
-            'is_active' => 'nullable|boolean',
-        ], [], [
-            'Product_name' => 'اسم المنتج',
-            'category_id' => 'القسم',
-            'sku' => 'رمز المنتج',
-            'barcode' => 'الباركود',
-            'description' => 'الملاحظات',
-            'photo' => 'صورة المنتج',
-            'cost_price' => 'سعر التكلفة',
-            'sell_price' => 'سعر البيع',
-            'tax_rate' => 'نسبة الضريبة',
-            'reorder_point' => 'نقطة اعادة الطلب',
-            'wac' => 'متوسط السعر المرجح',
-            'stock_qty' => 'الكمية',
-            'expire_date' => 'تاريخ الانتهاء',
-            'alert_qty' => 'كمية التنبيه',
-            'is_variant' => 'له متغيرات',
-            'variant_name' => 'اسم المتغير',
-            'unit' => 'الوحدة',
-            'variations' => 'المتغيرات',
-            'max_stock' => 'الكمية القصوى',
-            'is_featured' => 'منتج مميز',
-            'is_active' => 'الحالة',
-        ]);
+        $validated = $request->validated();
 
         $validated['cost_price'] = $request->cost_price ?? 0;
         $validated['sell_price'] = $request->sell_price ?? 0;
@@ -211,7 +125,14 @@ class ProductsController extends Controller
             File::delete(public_path('uploads/products/' . $product->photo));
         }
         
-        $product->delete();
+        try {
+            $product->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // FK restrict: product has sales history — block the delete.
+            session()->flash('error', 'لا يمكن حذف منتج له مبيعات سابقة');
+            return back();
+        }
+
         session()->flash('delete', 'تم حذف المنتج بنجاح');
         return back();
     }

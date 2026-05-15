@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Requests\StockAdjustments\StoreStockAdjustmentRequest;
 use Illuminate\Support\Facades\Auth;
 use App\Models\StockAdjustment;
 use App\Models\Products;
@@ -16,17 +17,8 @@ class StockAdjustmentController extends Controller
         return view('stock_adjustments.stock_adjustments', compact('stock_adjustments', 'products'));
     }
 
-    public function store(Request $request)
+    public function store(StoreStockAdjustmentRequest $request)
     {
-        $request->validate([
-            'product_id' => 'required',
-            'qty_change' => 'required|integer',
-            'type' => 'required',
-        ], [
-            'product_id.required' => 'يرجي اختيار المنتج',
-            'qty_change.required' => 'يرجي ادخال الكمية',
-            'type.required' => 'يرجي اختيار نوع التعديل',
-        ]);
 
         StockAdjustment::create([
             'product_id'  => $request->product_id,

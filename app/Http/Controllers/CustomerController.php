@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Requests\Customers\StoreCustomerRequest;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Customer;
 
@@ -14,14 +15,8 @@ class CustomerController extends Controller
         return view('customers.customers', compact('customers'));
     }
 
-    public function store(Request $request)
+    public function store(StoreCustomerRequest $request)
     {
-        $request->validate([
-            'Customer_name' => 'required',
-        ], [
-            'Customer_name.required' => 'يرجي ادخال اسم العميل',
-        ]);
-
         Customer::create([
             'Customer_name'   => $request->Customer_name,
             'phone'          => $request->phone,
@@ -37,14 +32,8 @@ class CustomerController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request)
+    public function update(StoreCustomerRequest $request)
     {
-        $request->validate([
-            'Customer_name' => 'required',
-        ], [
-            'Customer_name.required' => 'يرجي ادخال اسم العميل',
-        ]);
-
         $customer = Customer::findOrFail($request->id);
         $customer->update([
             'Customer_name'   => $request->Customer_name,

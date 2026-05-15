@@ -18,7 +18,8 @@ class CreateSaleItemsTable extends Migration
             $table->unsignedBigInteger('sale_id');
             $table->foreign('sale_id')->references('id')->on('sales')->onDelete('cascade');
             $table->unsignedBigInteger('product_id');
-            $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
+            // restrict: never delete a product that has sales history.
+            $table->foreign('product_id')->references('id')->on('products')->onDelete('restrict');
             $table->integer('qty');
             $table->decimal('unit_price', 10, 2);
             $table->decimal('total', 10, 2);

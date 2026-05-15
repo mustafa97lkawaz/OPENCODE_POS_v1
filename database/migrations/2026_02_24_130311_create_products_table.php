@@ -33,6 +33,10 @@ class CreateProductsTable extends Migration
 
             $table->index('sku');
             $table->index('barcode');
+            $table->index('category_id');
+
+            // Referential integrity: if a category is deleted, null out the link.
+            $table->foreign('category_id')->references('id')->on('categories')->onDelete('set null');
         });
     }
 

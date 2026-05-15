@@ -258,7 +258,8 @@
                                 <div class="form-group">
                                     <label>هل المنتج له متغيرات؟</label>
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="is_variant" id="is_variant">
+                                        <input type="hidden" name="is_variant" value="0">
+                                        <input type="checkbox" name="is_variant" id="is_variant" value="1">
                                         <span class="toggle-slider"></span>
                                     </label>
                                 </div>
@@ -326,7 +327,8 @@
                                     <label>منتج مميز</label>
                                     <br>
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="is_featured" id="is_featured">
+                                        <input type="hidden" name="is_featured" value="0">
+                                        <input type="checkbox" name="is_featured" id="is_featured" value="1">
                                         <span class="toggle-slider"></span>
                                     </label>
                                 </div>

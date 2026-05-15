@@ -261,7 +261,8 @@
                                 <div class="form-group">
                                     <label>هل المنتج له متغيرات؟</label>
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="is_variant" id="is_variant" {{ $product->is_variant ? 'checked' : '' }}>
+                                        <input type="hidden" name="is_variant" value="0">
+                                        <input type="checkbox" name="is_variant" id="is_variant" value="1" {{ $product->is_variant ? 'checked' : '' }}>
                                         <span class="toggle-slider"></span>
                                     </label>
                                 </div>
@@ -372,7 +373,8 @@
                                     <label>منتج مميز</label>
                                     <br>
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="is_featured" id="is_featured" {{ $product->is_featured ? 'checked' : '' }}>
+                                        <input type="hidden" name="is_featured" value="0">
+                                        <input type="checkbox" name="is_featured" id="is_featured" value="1" {{ $product->is_featured ? 'checked' : '' }}>
                                         <span class="toggle-slider"></span>
                                     </label>
                                 </div>
